@@ -34,10 +34,7 @@ class AuthService {
           await prefs.setInt('mahasiswa_id', mahasiswa['id']);
           await prefs.setString('mahasiswa_nama', mahasiswa['nama'] ?? '');
           await prefs.setString('mahasiswa_nim', mahasiswa['nim'] ?? '');
-          await prefs.setString(
-            'mahasiswa_jurusan',
-            mahasiswa['jurusan'] ?? '',
-          );
+          await prefs.setString('mahasiswa_kelas', mahasiswa['kelas'] ?? '');
           await prefs.setString('mahasiswa_prodi', mahasiswa['prodi'] ?? '');
         }
       } catch (e) {
@@ -74,14 +71,14 @@ class AuthService {
     required int id,
     required String nama,
     required String nim,
-    // required String jurusan,
+    required String kelas,
     required String prodi,
   }) async {
     final token = await getToken();
 
     final result = await ApiService.putRequest(
       "mahasiswa/$id", // endpoint update mahasiswa
-      {"nama": nama, "nim": nim, "jurusan": "Teknik Elektro", "prodi": prodi},
+      {"nama": nama, "nim": nim, "kelas": kelas},
       token: token,
     );
 
@@ -92,8 +89,8 @@ class AuthService {
         // update data di lokal juga
         await prefs.setString('mahasiswa_nama', nama);
         await prefs.setString('mahasiswa_nim', nim);
-        // await prefs.setString('mahasiswa_jurusan', jurusan);
         await prefs.setString('mahasiswa_prodi', prodi);
+        await prefs.setString('mahasiswa_kelas', kelas);
       } catch (e) {
         print("Error update local mahasiswa: $e");
       }

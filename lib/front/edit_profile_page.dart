@@ -15,7 +15,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   // Controller untuk form
   final TextEditingController _namaController = TextEditingController();
   final TextEditingController _nimController = TextEditingController();
-  final TextEditingController _jurusanController = TextEditingController();
+  final TextEditingController _kelasController = TextEditingController();
   final TextEditingController _prodiController = TextEditingController();
 
   int? mahasiswaId;
@@ -35,7 +35,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       mahasiswaId = prefs.getInt('mahasiswa_id');
       _namaController.text = prefs.getString('mahasiswa_nama') ?? '';
       _nimController.text = prefs.getString('mahasiswa_nim') ?? '';
-      _jurusanController.text = prefs.getString('mahasiswa_jurusan') ?? '';
+      _kelasController.text = prefs.getString('mahasiswa_kelas') ?? '';
       _prodiController.text = prefs.getString('mahasiswa_prodi') ?? '';
     });
   }
@@ -59,8 +59,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
       id: mahasiswaId!,
       nama: _namaController.text,
       nim: _nimController.text,
-      // jurusan: _jurusanController.text,
       prodi: _prodiController.text,
+      kelas: _kelasController.text,
     );
 
     setState(() {
@@ -228,9 +228,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ),
                     const SizedBox(height: 15),
                     TextFormField(
-                      controller: _jurusanController,
+                      controller: _kelasController,
                       decoration: const InputDecoration(
-                        labelText: "Jurusan",
+                        labelText: "Kelas",
                         border: OutlineInputBorder(),
                       ),
                     ),
