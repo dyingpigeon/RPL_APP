@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.18.21:8000/api/v1';
+  // Base URL API
+  static const String baseUrl = 'https://13ae5d54d6c1.ngrok-free.app/api/v1';
 
-  // Helper POST request
+  /// POST request helper
   static Future<Map<String, dynamic>> postRequest(
     String endpoint,
     Map<String, String> body, {
@@ -34,7 +35,7 @@ class ApiService {
     }
   }
 
-  // Helper GET request
+  /// GET request helper
   static Future<Map<String, dynamic>> getRequest(
     String endpoint, {
     String? token,
@@ -62,7 +63,7 @@ class ApiService {
     }
   }
 
-  // Helper PUT request
+  /// PUT request helper
   static Future<Map<String, dynamic>> putRequest(
     String endpoint,
     Map<String, String> body, {
