@@ -166,7 +166,7 @@ class _HomePageState extends State<HomePage> {
                 const CircleAvatar(
                   radius: 28,
                   backgroundImage: AssetImage(
-                    'assets/profile.png',
+                    'assets/profile.jpg',
                   ), // pastikan ada
                 ),
               ],

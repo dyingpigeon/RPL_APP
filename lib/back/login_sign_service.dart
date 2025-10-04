@@ -65,6 +65,32 @@ class AuthService {
   }
 
   // ----------------------------
+  // FORGOT PASSWORD
+  // ----------------------------
+  static Future<Map<String, dynamic>> forgotPassword(String email) async {
+    final result = await ApiService.postRequest("forgotPassword", {
+      "email": email,
+    });
+    return result;
+  }
+
+  // ----------------------------
+  // RESET PASSWORD
+  // ----------------------------
+  static Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    final result = await ApiService.postRequest("resetPassword", {
+      "email": email,
+      "otp": otp, // sesuai API
+      "newPassword": newPassword, // sesuai API
+    });
+    return result;
+  }
+
+  // ----------------------------
   // UPDATE MAHASISWA
   // ----------------------------
   static Future<Map<String, dynamic>> updateMahasiswa({
@@ -76,11 +102,11 @@ class AuthService {
   }) async {
     final token = await getToken();
 
-    final result = await ApiService.putRequest(
-      "mahasiswa/$id", // endpoint update mahasiswa
-      {"nama": nama, "nim": nim, "kelas": kelas},
-      token: token,
-    );
+    final result = await ApiService.putRequest("mahasiswa/$id", {
+      "nama": nama,
+      "nim": nim,
+      "kelas": kelas,
+    }, token: token);
 
     if (result['statusCode'] == 200) {
       try {

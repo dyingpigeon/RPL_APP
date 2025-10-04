@@ -42,7 +42,7 @@ class _NotificationPageState extends State<NotificationPage> {
             padding: EdgeInsets.only(right: 12),
             child: CircleAvatar(
               radius: 18,
-              backgroundImage: AssetImage("assets/profile.png"),
+              backgroundImage: AssetImage("assets/profile.jpg"),
             ),
           ),
         ],
