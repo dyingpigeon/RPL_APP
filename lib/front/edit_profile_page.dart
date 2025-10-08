@@ -14,7 +14,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final prefs = await SharedPreferences.getInstance();
     print("=== DEBUG SharedPreferences ===");
     print("mahasiswa_id: ${prefs.getInt('mahasiswa_id')}");
-    print("mahasiswa_nama: ${prefs.getString('mahasiswa_nama')}");
+    print("user_id: ${prefs.getInt('user_id')}");
+    print("mahasiswa_nama: ${prefs.getString('userName')}");
     print("mahasiswa_nim: ${prefs.getString('mahasiswa_nim')}");
     print("mahasiswa_kelas: ${prefs.getString('mahasiswa_kelas')}");
     print("mahasiswa_prodi: ${prefs.getString('mahasiswa_prodi')}");
@@ -30,6 +31,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final TextEditingController _prodiController = TextEditingController();
 
   int? mahasiswaId;
+  int? userId;
   bool _isLoading = false;
 
   @override
@@ -45,17 +47,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     setState(() {
       mahasiswaId = prefs.getInt('mahasiswa_id');
-      _namaController.text = prefs.getString('mahasiswa_nama') ?? '';
+      userId = prefs.getInt('user_id');
+      _namaController.text = prefs.getString('userName') ?? '';
       _nimController.text = prefs.getString('mahasiswa_nim') ?? '';
       _kelasController.text = prefs.getString('mahasiswa_kelas') ?? '';
       _prodiController.text = prefs.getString('mahasiswa_prodi') ?? '';
     });
   }
 
-  // Simpan data ke API + update SharedPreferences
-  void _saveProfile() async {
-    if (mahasiswaId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("ID Mahasiswa tidak ditemukan!")));
+  // Fungsi gabungan untuk menyimpan kedua profil
+  void _saveAllProfiles() async {
+    if (mahasiswaId == null || userId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("ID Mahasiswa atau User tidak ditemukan!")));
       return;
     }
 
@@ -63,25 +68,54 @@ class _EditProfilePageState extends State<EditProfilePage> {
       _isLoading = true;
     });
 
-    // Kirim ke API lewat AuthService
-    final result = await AuthService.updateMahasiswa(
-      id: mahasiswaId!,
-      nama: _namaController.text,
-      nim: _nimController.text,
-      prodi: _prodiController.text,
-      kelas: _kelasController.text,
-    );
+    try {
+      // Jalankan kedua update secara berurutan
+      final resultMahasiswa = await AuthService.updateMahasiswa(
+        id: mahasiswaId!,
+        idu: userId!,
+        nama: _namaController.text,
+        nim: _nimController.text,
+        prodi: _prodiController.text,
+        kelas: _kelasController.text,
+      );
 
-    setState(() {
-      _isLoading = false;
-    });
+      final resultUser = await AuthService.updateUser(idu: userId!, nama: _namaController.text);
 
-    if (result['statusCode'] == 200) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profil berhasil diperbarui ke API")));
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Gagal update: ${result['data']['message'] ?? 'Unknown error'}")));
+      setState(() {
+        _isLoading = false;
+      });
+
+      // Cek hasil kedua request
+      bool mahasiswaSuccess = resultMahasiswa['statusCode'] == 200;
+      bool userSuccess = resultUser['statusCode'] == 200;
+
+      if (mahasiswaSuccess && userSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Semua profil berhasil diperbarui")));
+      } else if (mahasiswaSuccess) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Profil mahasiswa berhasil, tapi profil user gagal")));
+      } else if (userSuccess) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Profil user berhasil, tapi profil mahasiswa gagal")));
+      } else {
+        String errorMessage = "Kedua update gagal: ";
+        if (resultMahasiswa['data']?['message'] != null) {
+          errorMessage += "Mahasiswa: ${resultMahasiswa['data']['message']} ";
+        }
+        if (resultUser['data']?['message'] != null) {
+          errorMessage += "User: ${resultUser['data']['message']}";
+        }
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorMessage.isEmpty ? "Unknown error" : errorMessage)));
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
 
@@ -208,7 +242,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ),
                     const SizedBox(height: 25),
 
-                    // Tombol Save
+                    // Tombol Save (sekarang menjalankan kedua fungsi)
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -217,7 +251,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           padding: const EdgeInsets.symmetric(vertical: 15),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        onPressed: _isLoading ? null : _saveProfile,
+                        onPressed: _isLoading ? null : _saveAllProfiles,
                         child:
                             _isLoading
                                 ? const CircularProgressIndicator(color: Colors.white)

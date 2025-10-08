@@ -40,18 +40,20 @@ class CourseDetailPage extends StatelessWidget {
               children: [
                 const CircleAvatar(radius: 26, backgroundImage: AssetImage('assets/profile.jpg')),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      judul, // ← Menggunakan judul dari parameter
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      "Deadline: $deadline", // ← Menggunakan deadline dari parameter
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                  ],
+                Expanded(
+                  // ← TAMBAHKAN EXPANDED DI SINI
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        judul,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text("Deadline: $deadline", style: const TextStyle(color: Colors.grey)),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -132,13 +134,13 @@ class CourseDetailPage extends StatelessWidget {
             const SizedBox(height: 20),
 
             // Comment section
-            TextField(
-              decoration: InputDecoration(
-                hintText: "Add private comment ...",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                suffixIcon: const Icon(Icons.send),
-              ),
-            ),
+            // TextField(
+            //   decoration: InputDecoration(
+            //     hintText: "Add private comment ...",
+            //     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            //     suffixIcon: const Icon(Icons.send),
+            //   ),
+            // ),
           ],
         ),
       ),

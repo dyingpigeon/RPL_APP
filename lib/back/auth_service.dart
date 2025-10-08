@@ -30,7 +30,7 @@ class AuthService {
         // Simpan data mahasiswa
         if (mahasiswa != null) {
           await prefs.setInt('mahasiswa_id', mahasiswa['id']);
-          await prefs.setString('mahasiswa_nama', mahasiswa['nama'] ?? '');
+          await prefs.setInt('mahasiswa_user', mahasiswa['userId'] ?? '');
           await prefs.setString('mahasiswa_nim', mahasiswa['nim'] ?? '');
           await prefs.setString('mahasiswa_kelas', mahasiswa['kelas'] ?? '');
           await prefs.setString('mahasiswa_prodi', mahasiswa['prodi'] ?? '');
@@ -91,6 +91,7 @@ class AuthService {
   // ----------------------------
   static Future<Map<String, dynamic>> updateMahasiswa({
     required int id,
+    required int idu,
     required String nama,
     required String nim,
     required String kelas,
@@ -99,16 +100,24 @@ class AuthService {
     final token = await getToken();
 
     final result = await ApiService.putRequest("mahasiswa/$id", {
-      "nama": nama,
+      // "nama": nama,
       "nim": nim,
       "kelas": kelas,
       "prodi": prodi,
     }, token: token);
 
+    // final resultuser = await ApiService.putRequest("user/$idu", {
+    //   "name": nama,
+    //   // "nim": nim,
+    //   // "kelas": kelas,
+    //   // "prodi": prodi,
+    // }, token: token);
+
     if (result['statusCode'] == 200) {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('mahasiswa_nama', nama);
+        await prefs.setString('userName', nama);
         await prefs.setString('mahasiswa_nim', nim);
         await prefs.setString('mahasiswa_prodi', prodi);
         await prefs.setString('mahasiswa_kelas', kelas);
@@ -118,6 +127,32 @@ class AuthService {
     }
 
     return result;
+  }
+
+  static Future<Map<String, dynamic>> updateUser({required int idu, required String nama}) async {
+    final token = await getToken();
+
+    final resultuser = await ApiService.putRequest("user/$idu", {
+      "name": nama,
+      // "nim": nim,
+      // "kelas": kelas,
+      // "prodi": prodi,
+    }, token: token);
+
+    if (resultuser['statusCode'] == 200) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('mahasiswa_nama', nama);
+        await prefs.setString('userName', nama);
+        // await prefs.setString('mahasiswa_nim', nim);
+        // await prefs.setString('mahasiswa_prodi', prodi);
+        // await prefs.setString('mahasiswa_kelas', kelas);
+      } catch (e) {
+        print("Error update local mahasiswa: $e");
+      }
+    }
+
+    return resultuser;
   }
 
   // ----------------------------
@@ -203,4 +238,30 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   }
+
+  // ----------------------------
+  // UTILITY METHODS
+  // // ----------------------------
+  // static Future<bool> isLoggedIn() async {
+  //   final token = await getToken();
+  //   return token != null && token.isNotEmpty;
+  // }
+
+  // static Future<bool> isMahasiswa() async {
+  //   final role = await getUserRole();
+  //   return role == 'mahasiswa';
+  // }
+
+  // static Future<bool> hasMahasiswaData() async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   return prefs.getInt('mahasiswa_id') != null;
+  // }
+
+  // // ----------------------------
+  // // LOGOUT
+  // // ----------------------------
+  // static Future<void> logout() async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   await prefs.clear();
+  // }
 }
