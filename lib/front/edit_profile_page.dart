@@ -239,6 +239,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     TextFormField(
                       controller: _prodiController,
                       decoration: const InputDecoration(labelText: "Prodi", border: OutlineInputBorder()),
+                      readOnly: true,
                     ),
                     const SizedBox(height: 25),
 

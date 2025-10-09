@@ -345,7 +345,7 @@ class _HomePageState extends State<HomePage> {
                       // context,
                       mk['id'] ?? 0, // ID jadwal dari database
                       mk['title'] ?? 'Mata Kuliah',
-                      mk['dosen'] ?? 'Dosen', // Ini masih string, perlu di-extract
+                      mk['dosenId'] ?? 'Dosen', // Ini masih string, perlu di-extract
                       mk['kelas'] ?? 'Kelas',
                       mk['isRed'] ?? false,
                       hari: mk['hari'] ?? '',

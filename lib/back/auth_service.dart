@@ -116,13 +116,68 @@ class AuthService {
     if (result['statusCode'] == 200) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('mahasiswa_nama', nama);
-        await prefs.setString('userName', nama);
-        await prefs.setString('mahasiswa_nim', nim);
-        await prefs.setString('mahasiswa_prodi', prodi);
-        await prefs.setString('mahasiswa_kelas', kelas);
+
+        // Debug response structure
+        print("📦 Struktur response:");
+        print("   - result: ${result.keys}");
+        print("   - result['data']: ${result['data']}");
+
+        // Handle berbagai kemungkinan struktur response
+        dynamic responseData;
+
+        if (result['data'] is Map && result['data'].containsKey('data')) {
+          responseData = result['data']['data']; // Format: {"data": {...}}
+        } else if (result['data'] is Map) {
+          responseData = result['data']; // Format: langsung object
+        } else {
+          responseData = result['data']; // Fallback
+        }
+
+        print("🔍 Data dari response API:");
+        print("   - responseData: $responseData");
+
+        if (responseData is Map) {
+          // Gunakan data dari API, fallback ke parameter jika tidak ada
+          await prefs.setString('mahasiswa_nim', (responseData['nim']?.toString() ?? nim));
+          await prefs.setString('mahasiswa_prodi', (responseData['prodi']?.toString() ?? prodi));
+          await prefs.setString('mahasiswa_kelas', (responseData['kelas']?.toString() ?? kelas));
+          await prefs.setString('mahasiswa_tahun_masuk', (responseData['tahunMasuk']?.toString() ?? kelas));
+
+          // Data tambahan dari response
+          if (responseData['id'] != null) {
+            await prefs.setInt('mahasiswa_id', responseData['id'] as int);
+          }
+          if (responseData['userId'] != null) {
+            await prefs.setInt('user_id', responseData['userId'] as int);
+          }
+          if (responseData['tahunMasuk'] != null) {
+            await prefs.setString('tahunMasuk', responseData['tahunMasuk'].toString());
+          }
+          if (responseData['tahunMasuk'] != null) {
+            await prefs.setString('tahunMasuk', responseData['tahunMasuk'].toString());
+          }
+
+          print("✅ Berhasil update SharedPreferences dari API response");
+        } else {
+          // Fallback ke parameter jika struktur tidak sesuai
+          print("⚠️ Struktur response tidak sesuai, menggunakan parameter sebagai fallback");
+          await prefs.setString('mahasiswa_nim', nim);
+          await prefs.setString('mahasiswa_prodi', prodi);
+          await prefs.setString('mahasiswa_kelas', kelas);
+        }
       } catch (e) {
-        print("Error update local mahasiswa: $e");
+        print("❌ Error update local mahasiswa: $e");
+
+        // Fallback: simpan menggunakan parameter
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('mahasiswa_nim', nim);
+          await prefs.setString('mahasiswa_prodi', prodi);
+          await prefs.setString('mahasiswa_kelas', kelas);
+          print("✅ Fallback: SharedPreferences diupdate menggunakan parameter");
+        } catch (fallbackError) {
+          print("❌ Fallback juga gagal: $fallbackError");
+        }
       }
     }
 

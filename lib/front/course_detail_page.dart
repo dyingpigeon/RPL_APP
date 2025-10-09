@@ -31,58 +31,55 @@ class CourseDetailPage extends StatelessWidget {
         title: Text(judul, style: const TextStyle(color: Colors.black)),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        // HAPUS PADDING DI SINI agar container bisa memenuhi lebar layar
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header dengan informasi tugas
-            Row(
-              children: [
-                const CircleAvatar(radius: 26, backgroundImage: AssetImage('assets/profile.jpg')),
-                const SizedBox(width: 12),
-                Expanded(
-                  // ← TAMBAHKAN EXPANDED DI SINI
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        judul,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text("Deadline: $deadline", style: const TextStyle(color: Colors.grey)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Container detail tugas
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16), // ← TAMBAHKAN PADDING DI CONTAINER HEADER
+              child: Row(
+                children: [
+                  const CircleAvatar(radius: 26, backgroundImage: AssetImage('assets/profile.jpg')),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          judul,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text("Deadline: $deadline", style: const TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Container detail tugas - MEMENUHI LAYAR
+            Container(
+              width: double.infinity, // ← PASTIKAN LEBAR MEMENUHI
+              margin: const EdgeInsets.symmetric(horizontal: 0), // ← HILANGKAN MARGIN HORIZONTAL
+              padding: const EdgeInsets.all(16), // ← TAMBAHKAN PADDING INTERNAL
               decoration: BoxDecoration(
                 border: Border.all(color: primaryRed, width: 1.5),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(0), // ← OPSIONAL: hilangkan border radius untuk efek full width
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    judul, // ← Menggunakan judul dari parameter
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  Text(judul, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 6),
-                  Text(
-                    "Deadline: $deadline", // ← Menggunakan deadline dari parameter
-                    style: const TextStyle(color: Colors.red),
-                  ),
+                  Text("Deadline: $deadline", style: const TextStyle(color: Colors.red)),
                   const SizedBox(height: 6),
                   const Text("100 points", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
                   const SizedBox(height: 10),
                   Text(
-                    deskripsi.isNotEmpty ? deskripsi : "Tidak ada deskripsi", // ← Menggunakan deskripsi dari parameter
+                    deskripsi.isNotEmpty ? deskripsi : "Tidak ada deskripsi",
                     style: const TextStyle(fontSize: 14, color: Colors.black87),
                   ),
                   const SizedBox(height: 10),
@@ -91,56 +88,43 @@ class CourseDetailPage extends StatelessWidget {
                   if (fileUrl.isNotEmpty) ...[
                     const Text("File Terlampir:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     const SizedBox(height: 4),
-                    Text(
-                      fileUrl, // ← Menggunakan fileUrl dari parameter
-                      style: const TextStyle(fontSize: 14, color: Colors.blue),
-                    ),
+                    Text(fileUrl, style: const TextStyle(fontSize: 14, color: Colors.blue)),
                   ],
 
                   // Menampilkan jadwal ID untuk debugging
                   const SizedBox(height: 10),
-                  Text(
-                    "Jadwal ID: $jadwalId", // ← Menggunakan jadwalId dari parameter
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
+                  Text("Jadwal ID: $jadwalId", style: const TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
-            // File upload section
-            GestureDetector(
-              onTap: () {
-                // integrasi file picker nanti
-                _showFileUploadOptions(context);
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.black26),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.upload_file, color: Colors.black54),
-                    SizedBox(width: 8),
-                    Text("Choose a File or Drag it here"),
-                  ],
+            // File upload section - JUGA MEMENUHI LAYAR
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 0), // ← HILANGKAN MARGIN HORIZONTAL
+              child: GestureDetector(
+                onTap: () {
+                  _showFileUploadOptions(context);
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black26),
+                    borderRadius: BorderRadius.circular(0), // ← OPSIONAL: hilangkan border radius
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.upload_file, color: Colors.black54),
+                      SizedBox(width: 8),
+                      Text("Choose a File or Drag it here"),
+                    ],
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-
-            // Comment section
-            // TextField(
-            //   decoration: InputDecoration(
-            //     hintText: "Add private comment ...",
-            //     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            //     suffixIcon: const Icon(Icons.send),
-            //   ),
-            // ),
           ],
         ),
       ),

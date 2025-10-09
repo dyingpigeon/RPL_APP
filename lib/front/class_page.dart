@@ -1,3 +1,5 @@
+import 'package:elearning_rpl_5d/front/class_detail_page.dart';
+import '../back/auth_service.dart';
 import 'package:flutter/material.dart';
 import '../back/jadwal_service.dart'; // Import JadwalService yang baru
 
@@ -16,12 +18,27 @@ class _ClassPageState extends State<ClassPage> {
   List<dynamic> _jadwalList = [];
   bool _isLoading = true;
   String? _errorMessage;
+  String userName = "Mahasiswa"; // default sebelum fetch
 
   @override
   void initState() {
     super.initState();
     _today = DateTime.now();
     fetchJadwal();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    try {
+      final name = await AuthService.getUserName();
+      if (name != null && mounted) {
+        setState(() {
+          userName = name;
+        });
+      }
+    } catch (e) {
+      print("Error loading user name: $e");
+    }
   }
 
   // 🔹 Fungsi ambil data jadwal dari JadwalService yang baru
@@ -93,7 +110,7 @@ class _ClassPageState extends State<ClassPage> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
         ),
-        title: const Text("Hi, LiA!", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: Text('Hi, $userName!', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         actions: const [
           Padding(
             padding: EdgeInsets.only(right: 12),
@@ -118,15 +135,20 @@ class _ClassPageState extends State<ClassPage> {
                   const SizedBox(height: 16),
 
                   // 🔹 Loop data dari API dengan struktur yang baru
+                  // Dalam loop, tambahkan parameter dosenId
                   for (var jadwal in _jadwalList)
                     _classCard(
                       jadwal['title'] ?? "Mata Kuliah",
-                      "Dosen: ${jadwal['dosen']}",
+                      jadwal['dosen'] ?? "Dosen Tidak Diketahui", // ← String: nama dosen
                       "Kelas ${jadwal['kelas']} | ${jadwal['hari'].toString().toUpperCase()}",
                       primaryRed,
                       jadwal['ruangan'] ?? '-',
                       jadwal['jamMulai'] ?? '-',
                       jadwal['jamSelesai'] ?? '-',
+                      jadwal['dosenId'] ?? 1, // ← int: ID dosen untuk navigasi
+                      jadwal['id'] ?? 0,
+                      jadwal['hari'] ?? '',
+                      jadwal['kelas'] ?? '',
                     ),
 
                   if (_jadwalList.isEmpty)
@@ -164,33 +186,127 @@ class _ClassPageState extends State<ClassPage> {
     );
   }
 
-  // 🔹 Widget kartu kelas
+  // Tambahkan parameter tambahan dan onTap di _classCard
+  // Dalam ClassPage, modifikasi _classCard:
   Widget _classCard(
     String title,
-    String lecturer,
-    String info,
-    Color bgColor,
+    String dosen, // ← Nama dosen untuk display
+    String schedule,
+    Color primaryRed,
     String ruangan,
     String jamMulai,
     String jamSelesai,
+    int dosenId, // ← UBAH dari String ke int (parameter ke-8)
+    int jadwalId,
+    String hari,
+    String kelas,
   ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return GestureDetector(
+      onTap: () {
+        // DEBUG: Tampilkan data yang akan dikirim ke ClassDetail
+        print('=== DEBUG: Data yang dikirim ke ClassDetail ===');
+        print('Class Name: $title');
+        print('Schedule: $schedule');
+        print('Dosen: $dosen');
+        print('Dosen ID: $dosenId'); // ← Sekarang ada dosenId yang benar
+        print('Jadwal ID: $jadwalId');
+        print('Hari: $hari');
+        print('Ruangan: $ruangan');
+        print('Kelas: $kelas');
+        print('Jam Mulai: $jamMulai');
+        print('Jam Selesai: $jamSelesai');
+        print('============================================');
+
+        // Navigasi ke ClassDetail dengan dosenId yang benar
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => ClassDetail(
+                  className: title,
+                  schedule: schedule,
+                  dosenId: dosenId, // ← Sekarang pakai dosenId dari data
+                  jadwalId: jadwalId,
+                ),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 2))],
+          border: Border.all(color: primaryRed.withOpacity(0.3)),
+        ),
+        child: Row(
           children: [
-            Text(lecturer, style: const TextStyle(color: Colors.white70)),
-            const SizedBox(height: 4),
-            Text("Ruangan: $ruangan", style: const TextStyle(color: Colors.white70)),
-            Text("Jam: $jamMulai - $jamSelesai", style: const TextStyle(color: Colors.white70)),
+            // Indicator merah di kiri
+            Container(
+              width: 4,
+              height: 60,
+              decoration: BoxDecoration(color: primaryRed, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(width: 12),
+
+            // Konten card
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(dosen, style: const TextStyle(color: Colors.black54)), // ← Nama dosen
+                  const SizedBox(height: 2),
+                  Text(schedule, style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                ],
+              ),
+            ),
+
+            // Icon panah
+            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
           ],
         ),
-        trailing: Text(info, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
     );
   }
+
+  // Fungsi untuk extract dosenId dari nama dosen (sesuaikan dengan struktur data Anda)
+  int _extractDosenId(String namaDosen) {
+    // Contoh: jika namaDosen mengandung ID, atau Anda bisa mapping manual
+    // Untuk sementara, return default value atau cari cara lain untuk mendapatkan dosenId
+    print('⚠️ Perlu implementasi _extractDosenId untuk: $namaDosen');
+    return 1; // Default value, sesuaikan dengan kebutuhan
+  }
+
+  // 🔹 Widget kartu kelas
+  // Widget _classCard(
+  //   String title,
+  //   String lecturer,
+  //   String info,
+  //   Color bgColor,
+  //   String ruangan,
+  //   String jamMulai,
+  //   String jamSelesai,
+  // ) {
+  //   return Container(
+  //     margin: const EdgeInsets.only(bottom: 12),
+  //     decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(8)),
+  //     child: ListTile(
+  //       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  //       title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+  //       subtitle: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         children: [
+  //           Text(lecturer, style: const TextStyle(color: Colors.white70)),
+  //           const SizedBox(height: 4),
+  //           Text("Ruangan: $ruangan", style: const TextStyle(color: Colors.white70)),
+  //           Text("Jam: $jamMulai - $jamSelesai", style: const TextStyle(color: Colors.white70)),
+  //         ],
+  //       ),
+  //       trailing: Text(info, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+  //     ),
+  //   );
+  // }
 }
