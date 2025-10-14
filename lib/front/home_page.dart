@@ -133,18 +133,18 @@ class _HomePageState extends State<HomePage> {
     return "$dayName, ${dt.day} $monthName ${dt.year}";
   }
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-    if (index == 0) {
-      Navigator.pushReplacementNamed(context, '/home');
-    } else if (index == 1) {
-      Navigator.pushReplacementNamed(context, '/class');
-    } else if (index == 2) {
-      Navigator.pushReplacementNamed(context, '/edit');
-    }
-  }
+  // void _onItemTapped(int index) {
+  //   setState(() {
+  //     _selectedIndex = index;
+  //   });
+  //   if (index == 0) {
+  //     Navigator.pushReplacementNamed(context, '/home');
+  //   } else if (index == 1) {
+  //     Navigator.pushReplacementNamed(context, '/class');
+  //   } else if (index == 2) {
+  //     Navigator.pushReplacementNamed(context, '/edit');
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -152,21 +152,21 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      bottomNavigationBar: ClipRRect(
-        borderRadius: const BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-          selectedItemColor: Colors.white,
-          unselectedItemColor: Colors.white70,
-          backgroundColor: primaryRed,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-            BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: "Class"),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-          ],
-        ),
-      ),
+      // bottomNavigationBar: ClipRRect(
+      //   borderRadius: const BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
+      //   child: BottomNavigationBar(
+      //     currentIndex: _selectedIndex,
+      //     onTap: _onItemTapped,
+      //     selectedItemColor: Colors.white,
+      //     unselectedItemColor: Colors.white70,
+      //     backgroundColor: primaryRed,
+      //     items: const [
+      //       BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+      //       BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: "Class"),
+      //       BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+      //     ],
+      //   ),
+      // ),
       body: RefreshIndicator(
         onRefresh: _refreshData,
         child: Column(

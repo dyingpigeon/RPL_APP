@@ -463,21 +463,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
       ),
 
       // Bottom nav bar
-      bottomNavigationBar: ClipRRect(
-        borderRadius: const BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-          selectedItemColor: Colors.white,
-          unselectedItemColor: Colors.white70,
-          backgroundColor: const Color(0xFFB71C1C),
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-            BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: "Class"),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
-          ],
-        ),
-      ),
+      // bottomNavigationBar: ClipRRect(
+      //   borderRadius: const BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
+      //   child: BottomNavigationBar(
+      //     currentIndex: _selectedIndex,
+      //     onTap: _onItemTapped,
+      //     selectedItemColor: Colors.white,
+      //     unselectedItemColor: Colors.white70,
+      //     backgroundColor: const Color(0xFFB71C1C),
+      //     items: const [
+      //       BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+      //       BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: "Class"),
+      //       BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
+      //     ],
+      //   ),
+      // ),
     );
   }
 }
