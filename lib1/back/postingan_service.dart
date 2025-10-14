@@ -41,7 +41,7 @@ class PostinganService {
     }
   }
 
-  // Get semua postingan berdasarkan dosenId dan jadwalId DENGAN PAGINATION - DIPERBAIKI
+  // Get semua postingan berdasarkan dosenId dan jadwalId DENGAN PAGINATION
   static Future<List<Postingan>> getPostingan({required int dosenId, required int jadwalId}) async {
     _validateRequiredParams(dosenId: dosenId, jadwalId: jadwalId);
 
@@ -49,16 +49,16 @@ class PostinganService {
       final List<Postingan> allPostingan = [];
       int page = 1;
       bool hasMoreData = true;
-      int maxPages = 20;
+      int maxPages = 20; // Safety limit untuk menghindari infinite loop
 
-      print("🔄 Mulai mengambil data postingan dengan dosenId: $dosenId, jadwalId: $jadwalId");
+      print("🔄 Mulai mengambil data postingan dengan pagination...");
 
       while (hasMoreData && page <= maxPages) {
         final Map<String, String> queryParams = {
-          'dosenId': dosenId.toString(), // FILTER DOSEN ID
+          'dosenId': dosenId.toString(),
           'jadwalId': jadwalId.toString(),
           'page': page.toString(),
-          'per_page': '50'
+          'per_page': '50' // Sesuaikan dengan maksimal yang diizinkan API
         };
 
         final response = await ApiService.getRequest(endpoint, queryParams: queryParams);
@@ -68,31 +68,32 @@ class PostinganService {
         if (response['statusCode'] == 200) {
           final data = response['data'];
           
+          // Handle berbagai struktur response API
           List<dynamic> postinganList = [];
           
           if (data is List) {
+            // Jika response langsung array
             postinganList = data;
           } else if (data['data'] is List) {
+            // Jika response ada dalam property 'data'
             postinganList = data['data'];
           } else if (data['items'] is List) {
+            // Jika response ada dalam property 'items'
             postinganList = data['items'];
           } else if (data['postingan'] is List) {
+            // Jika response ada dalam property 'postingan'
             postinganList = data['postingan'];
           }
 
           print("📊 Page $page: ${postinganList.length} postingan");
 
           if (postinganList.isEmpty) {
+            // Tidak ada data lagi, stop loop
             hasMoreData = false;
             print("✅ Tidak ada data lagi di page $page");
           } else {
-            // FILTER LANGSUNG BERDASARKAN DOSEN ID
-            final filteredPostingan = postinganList.where((item) {
-              final itemDosenId = item['dosenId'] ?? 0;
-              return itemDosenId == dosenId;
-            }).toList();
-
-            final List<Postingan> pagePostingan = filteredPostingan
+            // Tambahkan data ke koleksi utama
+            final List<Postingan> pagePostingan = postinganList
                 .map((json) => Postingan.fromJson(json))
                 .toList();
             allPostingan.addAll(pagePostingan);
@@ -114,7 +115,9 @@ class PostinganService {
                 page++;
               }
             } else {
-              if (postinganList.length < 50) {
+              // Jika tidak ada metadata, increment page biasa
+              // Beberapa API tanpa metadata akan selalu return data, jadi kita batasi
+              if (postinganList.length < 50) { // Jika dapat kurang dari per_page, kemungkinan last page
                 hasMoreData = false;
                 print("✅ Kemungkinan last page (data < per_page)");
               } else {
@@ -129,10 +132,10 @@ class PostinganService {
         }
       }
 
-      print("✅ Total postingan berhasil diambil: ${allPostingan.length} untuk dosenId: $dosenId");
+      print("✅ Total postingan berhasil diambil: ${allPostingan.length}");
       return allPostingan;
     } catch (e) {
-      print("❌ Error fetching postingan dengan dosenId: $e");
+      print("❌ Error fetching postingan dengan pagination: $e");
       throw Exception('Error fetching postingan: $e');
     }
   }

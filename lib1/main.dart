@@ -5,6 +5,7 @@ import 'front/signup_page.dart';
 import 'front/home_page.dart';
 import 'front/edit_profile_page.dart';
 import 'front/forgot_password_page.dart';
+import 'front/class_page.dart';
 
 void main() {
   runApp(const MyApp());

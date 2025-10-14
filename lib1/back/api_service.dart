@@ -3,9 +3,10 @@ import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.18.21:8000/api/v1';
-  // static const String baseUrl = 'https://ecd08a6c5ece.ngrok-free.app/api/v1';
-
+  // static const String baseUrl = 'http://192.168.18.21:8000/api/v1';
+  // static const String baseUrl = 'http://192.168.18.11:8000/api/v1';
+  static const String baseUrl = 'http://10.0.2.2:8000/api/v2';
+  // static const String baseUrl = 'http://127.0.0.1:8000/api/v1';
   // Helper POST request
   static Future<Map<String, dynamic>> postRequest(String endpoint, Map<String, String> body, {String? token}) async {
     final url = Uri.parse("$baseUrl/$endpoint");
@@ -92,7 +93,7 @@ class ApiService {
       if (contentType == null || !contentType.contains('application/json')) {
         print('⚠️ GET Response is not JSON. Content-Type: $contentType');
         print(
-          '🔍 First 200 chars of response: ${response.body.length > 200 ? '${response.body.substring(0, 200)}...' : response.body}',
+          '🔍 First 200 chars of response: ${response.body.length > 200 ? response.body.substring(0, 200) + '...' : response.body}',
         );
 
         return {
@@ -100,7 +101,7 @@ class ApiService {
           "data": {
             "message": "Server returned non-JSON response",
             "content_type": contentType,
-            "body_preview": response.body.length > 200 ? '${response.body.substring(0, 200)}...' : response.body,
+            "body_preview": response.body.length > 200 ? response.body.substring(0, 200) + '...' : response.body,
           },
         };
       }

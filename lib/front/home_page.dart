@@ -6,6 +6,8 @@ import '/back/jadwal_service.dart';
 import '../back/auth_service.dart';
 import '/back/tugas_service.dart';
 
+const Color primaryRed = Color(0xFFC2000E);
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -14,12 +16,12 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final Color primaryRed = const Color(0xFFB71C1C);
   int _selectedIndex = 0;
 
   late Future<List<Map<String, dynamic>>> futureMataKuliah;
   late Future<List<Map<String, dynamic>>> futureTugas;
-  String userName = "Mahasiswa"; // default sebelum fetch
+  String userName = "User";
+  String userRole = "mahasiswa";
 
   late DateTime _today;
   late Timer _timer;
@@ -30,11 +32,27 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _today = DateTime.now();
     _timer = Timer.periodic(const Duration(minutes: 1), (_) {
-      setState(() {
-        _today = DateTime.now();
-      });
+      if (mounted) {
+        setState(() {
+          _today = DateTime.now();
+        });
+      }
     });
     _initializeData();
+    _loadUserRole();
+  }
+
+  Future<void> _loadUserRole() async {
+    try {
+      final role = await AuthService.getUserRole();
+      if (role != null && mounted) {
+        setState(() {
+          userRole = role;
+        });
+      }
+    } catch (e) {
+      print("Error loading user role: $e");
+    }
   }
 
   Future<void> _initializeData() async {
@@ -63,7 +81,6 @@ class _HomePageState extends State<HomePage> {
     }
 
     try {
-      // Pastikan user sudah login dan memiliki data mahasiswa
       final isLoggedIn = await AuthService.isLoggedIn();
       if (!isLoggedIn) {
         print("User belum login");
@@ -75,22 +92,13 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      final hasMahasiswaData = await AuthService.hasMahasiswaData();
-      if (!hasMahasiswaData) {
-        print("Data mahasiswa tidak tersedia");
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-        return;
-      }
+      final role = await AuthService.getUserRole();
+      
+      futureMataKuliah = JadwalService.fetchJadwal();
+      futureTugas = TugasService.fetchTugas();
 
-      // Load data jadwal dan tugas
       if (mounted) {
         setState(() {
-          futureMataKuliah = JadwalService.fetchJadwal();
-          futureTugas = TugasService.fetchTugas();
           _isLoading = false;
         });
       }
@@ -117,18 +125,8 @@ class _HomePageState extends State<HomePage> {
   String _formatFullDate(DateTime dt) {
     final days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
     final months = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
     ];
     String dayName = days[dt.weekday % 7];
     String monthName = months[dt.month - 1];
@@ -193,33 +191,54 @@ class _HomePageState extends State<HomePage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Hi, $userName!',
+                          userRole == 'mahasiswa' ? 'Hi, $userName!' : 'Selamat Mengajar, $userName!',
                           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                         const SizedBox(height: 4),
                         Text(formattedDate, style: const TextStyle(color: Colors.white70)),
                         const SizedBox(height: 8),
-                        FutureBuilder<Map<String, dynamic>>(
-                          future: AuthService.getMahasiswa(),
-                          builder: (context, snapshot) {
-                            if (snapshot.hasData) {
-                              final mahasiswa = snapshot.data!;
-                              final kelas = mahasiswa['kelas'] ?? '';
-                              final prodi = mahasiswa['prodi'] ?? '';
-                              if (kelas.isNotEmpty && prodi.isNotEmpty) {
-                                return Text(
-                                  '$prodi - $kelas',
-                                  style: const TextStyle(color: Colors.white70, fontSize: 14),
-                                );
+                        if (userRole == 'mahasiswa')
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: AuthService.getMahasiswa(),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData) {
+                                final mahasiswa = snapshot.data!;
+                                final kelas = mahasiswa['kelas'] ?? '';
+                                final prodi = mahasiswa['prodi'] ?? '';
+                                if (kelas.isNotEmpty && prodi.isNotEmpty) {
+                                  return Text(
+                                    '$prodi - $kelas',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                                  );
+                                }
                               }
-                            }
-                            return const SizedBox();
-                          },
-                        ),
+                              return const SizedBox();
+                            },
+                          )
+                        else if (userRole == 'dosen')
+                          FutureBuilder<Map<String, dynamic>>(
+                            future: AuthService.getDosen(),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData) {
+                                final dosen = snapshot.data!;
+                                final nama = dosen['nama'] ?? '';
+                                if (nama.isNotEmpty) {
+                                  return Text(
+                                    'Dosen $nama',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                                  );
+                                }
+                              }
+                              return const Text('Dosen', style: TextStyle(color: Colors.white70, fontSize: 14));
+                            },
+                          ),
                       ],
                     ),
                   ),
-                  const CircleAvatar(radius: 28, backgroundImage: AssetImage('assets/profile.jpg')),
+                  const CircleAvatar(
+                    radius: 28, 
+                    backgroundImage: AssetImage('assets/profile.jpg'),
+                  ),
                 ],
               ),
             ),
@@ -239,9 +258,12 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (_isLoading)
-                        const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator()))
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
                       else
-                        ..._buildContent(),
+                        ..._buildContentByRole(),
                     ],
                   ),
                 ),
@@ -253,351 +275,416 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  List<Widget> _buildContent() {
-    return [
-      // --- Mata Kuliah ---
-      const Text("Mata Kuliah Hari Ini", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8),
-      Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade400, width: 1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: SizedBox(
-          height: 200,
-          child: FutureBuilder<List<Map<String, dynamic>>>(
-            future: futureMataKuliah,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              } else if (snapshot.hasError) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, color: Colors.grey.shade400, size: 48),
-                      const SizedBox(height: 8),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          "Error: ${snapshot.error}",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ElevatedButton(
-                        onPressed: _refreshData,
-                        style: ElevatedButton.styleFrom(backgroundColor: primaryRed),
-                        child: const Text("Coba Lagi", style: TextStyle(color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                );
-              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.school_outlined, color: Colors.grey.shade400, size: 48),
-                      const SizedBox(height: 8),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          "Tidak ada jadwal mata kuliah\nhari ini",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              } else {
-                final mataKuliah = snapshot.data!;
-
-                // DEBUG: Tampilkan semua data yang diterima dari JadwalService
-                print('=== DEBUG: Data dari JadwalService ===');
-                for (var i = 0; i < mataKuliah.length; i++) {
-                  final mk = mataKuliah[i];
-                  print('Item $i:');
-                  print('  - id: ${mk['id']}');
-                  print('  - title: ${mk['title']}');
-                  print('  - dosen: ${mk['dosen']}');
-                  print('  - kelas: ${mk['kelas']}');
-                  print('  - hari: ${mk['hari']}');
-                  print('  - jamMulai: ${mk['jamMulai']}');
-                  print('  - jamSelesai: ${mk['jamSelesai']}');
-                  print('  - ruangan: ${mk['ruangan']}');
-                  print('  - semester: ${mk['semester']}');
-                  print('  - prodi: ${mk['prodi']}');
-                  print('  - matkulId: ${mk['matkulId']}');
-                  print('  ---');
+  List<Widget> _buildContentByRole() {
+    if (userRole == 'mahasiswa') {
+      return [
+        const Text("Jadwal Kelas Hari Ini", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade400, width: 1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: SizedBox(
+            height: 200,
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: futureMataKuliah,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return _buildErrorState(snapshot.error.toString());
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return _buildEmptyState(
+                    icon: Icons.school_outlined,
+                    message: "Tidak ada jadwal mata kuliah\nhari ini",
+                  );
+                } else {
+                  final mataKuliah = snapshot.data!;
+                  return ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: mataKuliah.length,
+                    itemBuilder: (context, index) {
+                      final mk = mataKuliah[index];
+                      return _courseCard(
+                        jadwalId: mk['id'] ?? 0,
+                        title: mk['title'] ?? 'Mata Kuliah',
+                        dosenId: mk['dosenId'] ?? 0,
+                        kelas: mk['kelas'] ?? 'Kelas',
+                        isRed: mk['isRed'] ?? false,
+                        hari: mk['hari'] ?? '',
+                        jamMulai: mk['jamMulai'] ?? '',
+                        jamSelesai: mk['jamSelesai'] ?? '',
+                        ruangan: mk['ruangan'] ?? '',
+                      );
+                    },
+                  );
                 }
-                print('===================================');
-
-                return ListView.builder(
-                  padding: EdgeInsets.zero,
-                  itemCount: mataKuliah.length,
-                  itemBuilder: (context, index) {
-                    final mk = mataKuliah[index];
-                    return _courseCard(
-                      // context,
-                      mk['id'] ?? 0, // ID jadwal dari database
-                      mk['title'] ?? 'Mata Kuliah',
-                      mk['dosenId'] ?? 'Dosen', // Ini masih string, perlu di-extract
-                      mk['kelas'] ?? 'Kelas',
-                      mk['isRed'] ?? false,
-                      hari: mk['hari'] ?? '',
-                      jamMulai: mk['jamMulai'] ?? '',
-                      jamSelesai: mk['jamSelesai'] ?? '',
-                      ruangan: mk['ruangan'] ?? '',
-                    );
-                  },
-                );
-              }
-            },
+              },
+            ),
           ),
         ),
-      ),
-
-      const SizedBox(height: 24),
-
-      const SizedBox(height: 24),
-
-      // --- Tugas ---
-      const SizedBox(height: 24),
-
-      // --- Tugas ---
-      const Text("Tugas Terdekat", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8),
-      Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade400, width: 1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: SizedBox(
-          height: 200,
-          child: FutureBuilder<List<Map<String, dynamic>>>(
-            future: futureTugas,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              } else if (snapshot.hasError) {
-                return Center(
-                  // ← GUNAKAN CENTER
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, color: Colors.grey.shade400, size: 48),
-                      const SizedBox(height: 8),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          "Error: ${snapshot.error}",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ElevatedButton(
-                        onPressed: _refreshData,
-                        style: ElevatedButton.styleFrom(backgroundColor: primaryRed),
-                        child: const Text("Coba Lagi", style: TextStyle(color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                );
-              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return Center(
-                  // ← GUNAKAN CENTER
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.assignment_outlined, color: Colors.grey.shade400, size: 48),
-                      const SizedBox(height: 8),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          "Tidak ada tugas terdekat",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              } else {
-                final tugas = snapshot.data!;
-                return ListView.builder(
-                  padding: EdgeInsets.zero,
-                  itemCount: tugas.length,
-                  itemBuilder: (context, index) {
-                    final t = tugas[index];
-                    final deadline = t['deadline']?.toString().split(" ")[0] ?? '-';
-                    return _taskCard(
-                      t['judul'] ?? 'Tugas', // Parameter 1: judul
-                      deadline, // Parameter 2: deadline
-                      t['isRed'] ?? false, // Parameter 3: isRed
-                      t['deskripsi'] ?? '', // Parameter 4: deskripsi (BARU)
-                      t['jadwalId'] ?? 0, // Parameter 5: jadwalId (BARU)
-                      t['fileUrl'] ?? '', // Parameter 6: fileUrl (BARU)
-                    );
-                  },
-                );
-              }
-            },
+        const SizedBox(height: 24),
+        
+        const Text("Tugas Terdekat", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade400, width: 1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: SizedBox(
+            height: 200,
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: futureTugas,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return _buildErrorState(snapshot.error.toString());
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return _buildEmptyState(
+                    icon: Icons.assignment_outlined,
+                    message: "Tidak ada tugas terdekat",
+                  );
+                } else {
+                  final tugas = snapshot.data!;
+                  return ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: tugas.length,
+                    itemBuilder: (context, index) {
+                      final t = tugas[index];
+                      final deadline = t['deadline']?.toString().split(" ")[0] ?? '-';
+                      return _taskCard(
+                        tugasId: t['id'] ?? 0,
+                        judul: t['judul'] ?? 'Tugas',
+                        deadline: deadline,
+                        isRed: t['isRed'] ?? false,
+                        deskripsi: t['deskripsi'] ?? '',
+                        jadwalId: t['jadwalId'] ?? 0,
+                        fileUrl: t['fileUrl'] ?? '',
+                        dosenId: t['dosenId'] ?? 0,
+                        dosenNama: t['dosenNama'] ?? 'Dosen',
+                      );
+                    },
+                  );
+                }
+              },
+            ),
           ),
         ),
-      ),
-    ];
+      ];
+    } else if (userRole == 'dosen') {
+      return [
+        const Text("Jadwal Mengajar Hari Ini", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade400, width: 1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: SizedBox(
+            height: 200,
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: futureMataKuliah,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return _buildErrorState(snapshot.error.toString());
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return _buildEmptyState(
+                    icon: Icons.school_outlined,
+                    message: "Tidak ada jadwal mengajar hari ini",
+                  );
+                } else {
+                  final jadwal = snapshot.data!;
+                  return ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: jadwal.length,
+                    itemBuilder: (context, index) {
+                      final j = jadwal[index];
+                      return _courseCard(
+                        jadwalId: j['id'] ?? 0,
+                        title: j['title'] ?? 'Mata Kuliah',
+                        dosenId: j['dosenId'] ?? 0,
+                        kelas: j['kelas'] ?? 'Kelas',
+                        isRed: j['isRed'] ?? false,
+                        hari: j['hari'] ?? '',
+                        jamMulai: j['jamMulai'] ?? '',
+                        jamSelesai: j['jamSelesai'] ?? '',
+                        ruangan: j['ruangan'] ?? '',
+                      );
+                    },
+                  );
+                }
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        
+        const Text("Tugas yang Dibuat", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade400, width: 1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: SizedBox(
+            height: 200,
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: futureTugas,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return _buildErrorState(snapshot.error.toString());
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return _buildEmptyState(
+                    icon: Icons.assignment_outlined,
+                    message: "Tidak ada tugas yang dibuat",
+                  );
+                } else {
+                  final tugas = snapshot.data!;
+                  return ListView.builder(
+                    padding: EdgeInsets.zero,
+                    itemCount: tugas.length,
+                    itemBuilder: (context, index) {
+                      final t = tugas[index];
+                      final deadline = t['deadline']?.toString().split(" ")[0] ?? '-';
+                      return _taskCard(
+                        tugasId: t['id'] ?? 0,
+                        judul: t['judul'] ?? 'Tugas',
+                        deadline: deadline,
+                        isRed: t['isRed'] ?? false,
+                        deskripsi: t['deskripsi'] ?? '',
+                        jadwalId: t['jadwalId'] ?? 0,
+                        fileUrl: t['fileUrl'] ?? '',
+                        dosenId: t['dosenId'] ?? 0,
+                        dosenNama: t['dosenNama'] ?? 'Dosen',
+                      );
+                    },
+                  );
+                }
+              },
+            ),
+          ),
+        ),
+      ];
+    } else {
+      return [
+        _buildEmptyState(
+          icon: Icons.error_outline,
+          message: "Role tidak dikenali",
+        ),
+      ];
+    }
   }
 
-  Widget _courseCard(
-    // BuildContext context,
-    int jadwal,
-    String title,
-    int dosen,
-    String kelas,
-    bool isRed, {
-    String hari = '',
-    String jamMulai = '',
-    String jamSelesai = '',
-    String ruangan = '',
-  }) {
-    return Container(
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, color: Colors.grey.shade400, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              "Terjadi Kesalahan",
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                error.length > 100 ? '${error.substring(0, 100)}...' : error,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _refreshData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryRed,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text("Coba Lagi"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({required IconData icon, required String message}) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.grey.shade400, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Widget _courseCard({
+  required int jadwalId,
+  required String title,
+  required int dosenId,
+  required String kelas,
+  required bool isRed,
+  String hari = '',
+  String jamMulai = '',
+  String jamSelesai = '',
+  String ruangan = '',
+}) {
+  final localPrimaryRed = primaryRed;
+  return Builder(
+    builder: (ctx) => Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: isRed ? primaryRed : const Color(0xFFF4C1C1),
+        color: isRed ? localPrimaryRed : const Color(0xFFF4C1C1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: ListTile(
-        title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text(
+          title, 
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Text(dosen, style: const TextStyle(color: Colors.white70)),
             if (hari.isNotEmpty && jamMulai.isNotEmpty)
-              Text('$hari, $jamMulai-$jamSelesai', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              Text(
+                '$hari, $jamMulai-$jamSelesai', 
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
             if (ruangan.isNotEmpty)
-              Text('Ruangan: $ruangan', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              Text(
+                'Ruangan: $ruangan', 
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
           ],
         ),
-        trailing: Text(kelas, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        trailing: Text(
+          kelas, 
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         onTap: () {
-          // DEBUG: Tampilkan data yang akan dikirim ke ClassDetail
           print('=== DEBUG: Data yang dikirim ke ClassDetail ===');
           print('Class Name: $title');
-          print('Schedule: $jamMulai - $jamSelesai');
-          print('Dosen: $dosen');
-          // print('Dosen ID (extracted): $dosen');
-          // print('Jadwal ID (generated): $jadwalId');
+          print('Jadwal ID: $jadwalId');
+          print('Dosen ID: $dosenId');
           print('Hari: $hari');
+          print('Jam: $jamMulai - $jamSelesai');
           print('Ruangan: $ruangan');
           print('Kelas: $kelas');
           print('============================================');
 
           Navigator.push(
-            context,
+            ctx,
             MaterialPageRoute(
-              builder:
-                  (context) => ClassDetail(
-                    className: title,
-                    schedule: '$jamMulai - $jamSelesai',
-                    dosenId: dosen,
-                    jadwalId: jadwal,
-                  ),
+              builder: (context) => ClassDetail(
+                className: title,
+                schedule: '$hari, $jamMulai-$jamSelesai',
+                dosenId: dosenId,
+                jadwalId: jadwalId,
+              ),
             ),
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
-  // Helper function untuk extract dosenId dari string dosen
-  // int _extractDosenId(String dosen) {
-  //   try {
-  //     // Coba extract ID dari format: "Nama Dosen (ID)"
-  //     final regex = RegExp(r'\((\d+)\)');
-  //     final match = regex.firstMatch(dosen);
-  //     if (match != null) {
-  //       return int.parse(match.group(1)!);
-  //     }
-
-  //     // Jika tidak ada format ID, gunakan hash dari string sebagai fallback
-  //     return dosen.hashCode.abs();
-  //   } catch (e) {
-  //     // Fallback ke nilai default jika terjadi error
-  //     return 1;
-  //   }
-  // }
-
-  // Helper function untuk extract jadwalId
-  // int _extractJadwalId(String title, String jamMulai, String jamSelesai) {
-  //   try {
-  //     // Generate unique ID berdasarkan kombinasi title dan jam
-  //     final uniqueString = '$title$jamMulai$jamSelesai';
-  //     return uniqueString.hashCode.abs();
-  //   } catch (e) {
-  //     return 1; // Fallback value
-  //   }
-  // }
-
-  // int _extractJadwalId(String dosen) {
-  //   try {
-  //     // Coba extract ID dari format: "Nama Dosen (ID)"
-  //     final regex = RegExp(r'\((\d+)\)');
-  //     final match = regex.firstMatch(dosen);
-  //     if (match != null) {
-  //       return int.parse(match.group(1)!);
-  //     }
-
-  //     // Jika tidak ada format ID, gunakan hash dari string sebagai fallback
-  //     return dosen.hashCode.abs();
-  //   } catch (e) {
-  //     // Fallback ke nilai default jika terjadi error
-  //     return 1;
-  //   }
-  // }
-
-  Widget _taskCard(String judul, String deadline, bool isRed, String deskripsi, int jadwalId, String fileUrl) {
-    return Container(
+Widget _taskCard({
+  required String judul,
+  required String deadline,
+  required bool isRed,
+  required String deskripsi,
+  required int jadwalId,
+  required String fileUrl,
+  required int tugasId,
+  required int dosenId,
+  required String dosenNama,
+}) {
+  final localPrimaryRed = primaryRed;
+  return Builder(
+    builder: (ctx) => Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: isRed ? primaryRed : const Color(0xFFF4C1C1),
+        color: isRed ? localPrimaryRed : const Color(0xFFF4C1C1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: ListTile(
-        title: Text(judul, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text(
+          judul, 
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          deskripsi.isNotEmpty && deskripsi.length > 50 
+            ? '${deskripsi.substring(0, 50)}...' 
+            : deskripsi,
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             const Text("Deadline", style: TextStyle(color: Colors.white70, fontSize: 12)),
-            Text(deadline, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            Text(
+              deadline, 
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+            ),
           ],
         ),
         onTap: () {
           Navigator.push(
-            context,
+            ctx,
             MaterialPageRoute(
-              builder:
-                  (context) => CourseDetailPage(
-                    judul: judul,
-                    jadwalId: jadwalId,
-                    deskripsi: deskripsi,
-                    deadline: deadline,
-                    fileUrl: fileUrl,
-                  ),
+              builder: (context) => CourseDetailPage(
+                tugasId: tugasId,
+                judul: judul,
+                deskripsi: deskripsi,
+                deadline: deadline,
+                fileUrl: fileUrl,
+                jadwalId: jadwalId,
+                dosenId: dosenId,
+                dosenNama: dosenNama,
+              ),
             ),
           );
-          // ← TAMBAHKAN INI
-          // Action ketika tugas ditekan
           print('Tugas ditekan: $judul');
-          // Bisa navigasi ke halaman detail tugas
         },
       ),
-    );
-  }
+    ),
+  );
 }
