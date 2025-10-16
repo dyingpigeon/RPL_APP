@@ -39,7 +39,7 @@ class _SignupPageState extends State<SignupPage> {
 
     setState(() => isLoading = true);
 
-    final result = await AuthService.signUp(name, email, password, role);
+    final result = await AuthService.register(name: name, email: email, password: password, role: role);
 
     setState(() => isLoading = false);
 

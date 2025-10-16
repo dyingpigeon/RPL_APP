@@ -16,7 +16,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 0;
+  // int _selectedIndex = 0;
 
   late Future<List<Map<String, dynamic>>> futureMataKuliah;
   late Future<List<Map<String, dynamic>>> futureTugas;
@@ -92,7 +92,7 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      final role = await AuthService.getUserRole();
+      // final role = await AuthService.getUserRole();
       
       futureMataKuliah = JadwalService.fetchJadwal();
       futureTugas = TugasService.fetchTugas();

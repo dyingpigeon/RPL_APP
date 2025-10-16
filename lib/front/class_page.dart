@@ -12,7 +12,7 @@ class ClassPage extends StatefulWidget {
 
 class _ClassPageState extends State<ClassPage> {
   final Color primaryRed = const Color(0xFFB71C1C);
-  final int _selectedIndex = 1;
+  // final int _selectedIndex = 1;
 
   late DateTime _today;
   List<dynamic> _jadwalList = [];
@@ -265,15 +265,15 @@ class _ClassPageState extends State<ClassPage> {
     return "$dayName, ${dt.day} $monthName ${dt.year}";
   }
 
-  void _onItemTapped(int index) {
-    if (index == 0) {
-      Navigator.pushReplacementNamed(context, '/home');
-    } else if (index == 1) {
-      // tetap di Class Page
-    } else if (index == 2) {
-      Navigator.pushReplacementNamed(context, '/edit');
-    }
-  }
+  // void _onItemTapped(int index) {
+  //   if (index == 0) {
+  //     Navigator.pushReplacementNamed(context, '/home');
+  //   } else if (index == 1) {
+  //     // tetap di Class Page
+  //   } else if (index == 2) {
+  //     Navigator.pushReplacementNamed(context, '/edit');
+  //   }
+  // }
 
   Widget _classCard(
     String title,

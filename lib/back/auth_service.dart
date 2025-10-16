@@ -2,139 +2,49 @@ import 'api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
-  // ----------------------------
-  // LOGIN - IMPROVED VERSION
-  // ----------------------------
-  static Future<Map<String, dynamic>> login(String email, String password) async {
-    final result = await ApiService.postRequest("login", {"email": email, "password": password});
+  // Keys untuk SharedPreferences
+  static const String _tokenKey = 'token';
+  static const String _tokenExpiresKey = 'token_expires_at';
+  static const String _userIdKey = 'user_id';
+  static const String _userNameKey = 'userName';
+  static const String _userEmailKey = 'userEmail';
+  static const String _userRoleKey = 'userRole';
+  static const String _userEmailVerifiedKey = 'userEmailVerified';
+  static const String _verificationCodeKey = 'verification_code';
+  static const String _verificationCodeExpiresKey = 'verification_code_expires';
+  
+  // Mahasiswa keys
+  static const String _mahasiswaIdKey = 'mahasiswa_id';
+  static const String _mahasiswaUserIdKey = 'mahasiswa_user';
+  static const String _mahasiswaNimKey = 'mahasiswa_nim';
+  static const String _mahasiswaKelasKey = 'mahasiswa_kelas';
+  static const String _mahasiswaProdiKey = 'mahasiswa_prodi';
+  static const String _mahasiswaDiplomaKey = 'mahasiswa_diploma';
+  static const String _mahasiswaTahunMasukKey = 'mahasiswa_tahun_masuk';
+  static const String _mahasiswaNomorProdiKey = 'mahasiswa_nomor_prodi';
+  static const String _mahasiswaNamaKey = 'mahasiswa_nama';
+  
+  // Dosen keys
+  static const String _dosenIdKey = 'dosen_id';
+  static const String _dosenUserIdKey = 'dosen_user';
+  static const String _dosenNamaKey = 'dosen_nama';
+  static const String _dosenNipKey = 'dosen_nip';
 
-    if (result['statusCode'] == 200) {
-      try {
-        final outerData = result['data'];
-        final responseData = outerData['data'];
-        final userData = responseData['user'];
-        final token = responseData['token'];
-        
-        final prefs = await SharedPreferences.getInstance();
-
-        // Simpan data user (umum untuk semua role)
-        await prefs.setInt('user_id', userData['id']);
-        await prefs.setString('userName', userData['name']);
-        await prefs.setString('userEmail', userData['email']);
-        await prefs.setString('userRole', userData['role']);
-        await prefs.setBool('userEmailVerified', userData['email_verified'] ?? false);
-        await prefs.setString('token', token);
-
-        print("✅ Data user disimpan - Role: ${userData['role']}");
-
-        // Simpan data mahasiswa JIKA ADA
-        final mahasiswa = responseData['mahasiswa'];
-        if (mahasiswa != null) {
-          await _saveMahasiswaData(_convertToStringMap(mahasiswa), prefs);
-          print("✅ Data mahasiswa disimpan");
-        }
-
-        // Simpan data dosen JIKA ADA
-        final dosen = responseData['dosen'];
-        if (dosen != null) {
-          await _saveDosenData(_convertToStringMap(dosen), prefs);
-          print("✅ Data dosen disimpan");
-        }
-
-        // Clear data yang tidak sesuai role untuk menghindari konflik
-        await _cleanupRoleData(userData['role'], prefs);
-
-      } catch (e) {
-        print("❌ ERROR menyimpan data user: $e");
-      }
-    }
-
-    return result;
-  }
-
-  // Helper method to convert any map to Map<String, dynamic>
-  static Map<String, dynamic> _convertToStringMap(dynamic data) {
-    if (data is Map<String, dynamic>) {
-      return data;
-    } else if (data is Map<dynamic, dynamic>) {
-      return data.cast<String, dynamic>();
-    } else if (data is Map) {
-      // Fallback for any other Map type
-      final result = <String, dynamic>{};
-      data.forEach((key, value) {
-        result[key.toString()] = value;
-      });
-      return result;
-    }
-    return {};
-  }
+  // ============================
+  // AUTHENTICATION METHODS
+  // ============================
 
   // ----------------------------
-  // HELPER METHODS
+  // REGISTER (REGISTRASI)
   // ----------------------------
-  static Future<void> _saveMahasiswaData(Map<String, dynamic> mahasiswa, SharedPreferences prefs) async {
-    await prefs.setInt('mahasiswa_id', mahasiswa['id'] ?? 0);
-    await prefs.setInt('mahasiswa_user', mahasiswa['userId'] ?? 0);
-    await prefs.setString('mahasiswa_nim', mahasiswa['nim']?.toString() ?? '');
-    await prefs.setString('mahasiswa_kelas', mahasiswa['kelas']?.toString() ?? '');
-    await prefs.setString('mahasiswa_prodi', mahasiswa['prodi']?.toString() ?? '');
-    await prefs.setString('mahasiswa_diploma', mahasiswa['diploma']?.toString() ?? '');
-    await prefs.setString('mahasiswa_tahun_masuk', mahasiswa['tahunMasuk']?.toString() ?? '');
-    await prefs.setInt('mahasiswa_nomor_prodi', mahasiswa['nomorProdi'] ?? 0);
-  }
-
-  static Future<void> _saveDosenData(Map<String, dynamic> dosen, SharedPreferences prefs) async {
-    await prefs.setInt('dosen_id', dosen['id'] ?? 0);
-    await prefs.setInt('dosen_user', dosen['userId'] ?? 0);
-    await prefs.setString('dosen_nama', dosen['nama']?.toString() ?? '');
-    await prefs.setString('dosen_nip', dosen['nip']?.toString() ?? '');
-  }
-
-  static Future<void> _cleanupRoleData(String role, SharedPreferences prefs) async {
-    if (role == 'mahasiswa') {
-      // Hapus data dosen jika user adalah mahasiswa
-      await prefs.remove('dosen_id');
-      await prefs.remove('dosen_user');
-      await prefs.remove('dosen_nama');
-      await prefs.remove('dosen_nip');
-    } else if (role == 'dosen') {
-      // Hapus data mahasiswa jika user adalah dosen
-      await prefs.remove('mahasiswa_id');
-      await prefs.remove('mahasiswa_user');
-      await prefs.remove('mahasiswa_nim');
-      await prefs.remove('mahasiswa_kelas');
-      await prefs.remove('mahasiswa_prodi');
-      await prefs.remove('mahasiswa_diploma');
-      await prefs.remove('mahasiswa_tahun_masuk');
-      await prefs.remove('mahasiswa_nomor_prodi');
-    }
-  }
-
-  static dynamic _extractResponseData(dynamic data) {
-    if (data is Map && data.containsKey('data')) {
-      return data['data']; // Format: {"data": {...}}
-    } else if (data is Map) {
-      return data; // Format: langsung object
-    }
-    return data; // Fallback
-  }
-
-  static Future<void> _fallbackSaveMahasiswa(String nim, String prodi, String kelas) async {
-    try {
-      final prefs = await SharedPreferences.getInstance(); // FIXED: Added this line
-      await prefs.setString('mahasiswa_nim', nim);
-      await prefs.setString('mahasiswa_prodi', prodi);
-      await prefs.setString('mahasiswa_kelas', kelas);
-      print("✅ Fallback: SharedPreferences diupdate menggunakan parameter");
-    } catch (fallbackError) {
-      print("❌ Fallback juga gagal: $fallbackError");
-    }
-  } 
-
-  // ----------------------------
-  // SIGN UP
-  // ----------------------------
-  static Future<Map<String, dynamic>> signUp(String name, String email, String password, String role) async {
+  static Future<Map<String, dynamic>> register({
+    required String name,
+    required String email,
+    required String password,
+    required String role,
+  }) async {
+    print('📝 Attempting registration for: $email, role: $role');
+    
     final result = await ApiService.postRequest("registrasi", {
       "name": name,
       "email": email,
@@ -142,15 +52,204 @@ class AuthService {
       "password_confirmation": password,
       "role": role,
     });
+    
+    if (result['statusCode'] == 201 || result['statusCode'] == 200) {
+      print('✅ Registration successful!');
+      if (result['data']['success'] == true) {
+        // Otomatis login setelah registrasi berhasil
+        final loginResult = await login(email, password);
+        return loginResult;
+      }
+    } else {
+      print('❌ Registration failed: ${result['data']}');
+    }
+    
     return result;
+  }
+
+  // ----------------------------
+  // LOGIN
+  // ----------------------------
+  static Future<Map<String, dynamic>> login(String email, String password) async {
+    print('🔐 Attempting login for: $email');
+    
+    final result = await ApiService.postRequest("login", {
+      "email": email, 
+      "password": password
+    });
+
+    if (result['statusCode'] == 200) {
+      try {
+        final outerData = result['data'];
+        
+        if (outerData['success'] == true) {
+          final responseData = outerData['data'];
+          final userData = responseData['user'];
+          final token = responseData['token'];
+          final tokenExpiresAt = responseData['token_expires_at'];
+          
+          final prefs = await SharedPreferences.getInstance();
+
+          // Simpan data user (umum untuk semua role)
+          await _saveUserData(userData, token, tokenExpiresAt, prefs);
+          print("✅ User data saved - Role: ${userData['role']}");
+
+          // Simpan data mahasiswa JIKA ADA
+          final mahasiswa = responseData['mahasiswa'];
+          if (mahasiswa != null) {
+            await _saveMahasiswaData(_convertToStringMap(mahasiswa), prefs);
+            print("✅ Mahasiswa data saved");
+          }
+
+          // Simpan data dosen JIKA ADA
+          final dosen = responseData['dosen'];
+          if (dosen != null) {
+            await _saveDosenData(_convertToStringMap(dosen), prefs);
+            print("✅ Dosen data saved");
+          }
+
+          // Clear data yang tidak sesuai role untuk menghindari konflik
+          await _cleanupRoleData(userData['role'], prefs);
+          
+          print('🎉 Login successful! Token saved, expires at: $tokenExpiresAt');
+        } else {
+          print('❌ Login failed: ${outerData['message']}');
+        }
+      } catch (e) {
+        print("❌ ERROR saving user data: $e");
+        print('🔍 Stack trace: ${e.toString()}');
+      }
+    } else {
+      print('❌ Login failed with status: ${result['statusCode']}');
+    }
+
+    return result;
+  }
+
+  // ----------------------------
+  // LOGOUT
+  // ----------------------------
+  static Future<Map<String, dynamic>> logout() async {
+    print('🚪 Attempting logout...');
+    
+    try {
+      // Panggil API logout untuk menghapus token di server
+      final result = await ApiService.postRequest("logout", {});
+      
+      if (result['statusCode'] == 200) {
+        print('✅ Logout API call successful');
+      } else {
+        print('⚠️ Logout API call failed with status: ${result['statusCode']}');
+      }
+    } catch (e) {
+      print('⚠️ Logout API call error: $e');
+    } finally {
+      // Clear local data regardless of API call result
+      final prefs = await SharedPreferences.getInstance();
+      await _clearAuthData(prefs);
+      print("✅ User logged out, all auth data cleared");
+    }
+    
+    return {"success": true, "message": "Logout successful"};
+  }
+
+  // ----------------------------
+  // REFRESH TOKEN
+  // ----------------------------
+  static Future<Map<String, dynamic>> refreshToken() async {
+    print('🔄 Attempting token refresh...');
+    
+    try {
+      final response = await ApiService.postRequest("refresh-token", {});
+      
+      if (response['statusCode'] == 200) {
+        final data = response['data'];
+        if (data['success'] == true) {
+          final newToken = data['data']['token'];
+          final newExpiresAt = data['data']['token_expires_at'];
+          
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_tokenKey, newToken);
+          await prefs.setString(_tokenExpiresKey, newExpiresAt);
+          
+          print('🔄 Token refreshed successfully! Expires at: $newExpiresAt');
+          return {
+            "success": true,
+            "token": newToken,
+            "expires_at": newExpiresAt
+          };
+        }
+      }
+      
+      print('❌ Token refresh failed: ${response['data']}');
+      return {
+        "success": false,
+        "message": "Token refresh failed"
+      };
+    } catch (e) {
+      print('❌ Token refresh error: $e');
+      return {
+        "success": false,
+        "message": "Token refresh error: $e"
+      };
+    }
+  }
+
+  // ----------------------------
+  // CHECK TOKEN VALIDITY
+  // ----------------------------
+  static Future<Map<String, dynamic>> checkToken() async {
+    print('🔍 Checking token validity...');
+    
+    try {
+      final response = await ApiService.getRequest('check-token');
+      
+      if (response['statusCode'] == 200) {
+        print('✅ Token is valid');
+        return {
+          "success": true,
+          "valid": true,
+          "user": response['data']['data'] ?? response['data']
+        };
+      } else {
+        print('❌ Token is invalid: ${response['statusCode']}');
+        return {
+          "success": false,
+          "valid": false,
+          "message": "Token validation failed"
+        };
+      }
+    } catch (e) {
+      print('❌ Token check error: $e');
+      return {
+        "success": false,
+        "valid": false,
+        "message": "Token check error: $e"
+      };
+    }
   }
 
   // ----------------------------
   // FORGOT PASSWORD
   // ----------------------------
   static Future<Map<String, dynamic>> forgotPassword(String email) async {
+    print('🔑 Requesting password reset for: $email');
+    
     final result = await ApiService.postRequest("forgot-password", {"email": email});
-    return result;
+    
+    if (result['statusCode'] == 200) {
+      print('✅ Password reset link sent!');
+      return {
+        "success": true,
+        "message": "Password reset link sent to your email"
+      };
+    } else {
+      print('❌ Password reset request failed: ${result['data']}');
+      return {
+        "success": false,
+        "message": result['data']['message'] ?? "Password reset failed"
+      };
+    }
   }
 
   // ----------------------------
@@ -162,17 +261,108 @@ class AuthService {
     required String password,
     required String passwordConfirmation,
   }) async {
+    print('🔄 Resetting password for: $email');
+    
     final result = await ApiService.postRequest("reset-password", {
       "email": email,
       "token": token,
       "password": password,
       "password_confirmation": passwordConfirmation,
     });
-    return result;
+    
+    if (result['statusCode'] == 200) {
+      print('✅ Password reset successful!');
+      return {
+        "success": true,
+        "message": "Password has been reset successfully"
+      };
+    } else {
+      print('❌ Password reset failed: ${result['data']}');
+      return {
+        "success": false,
+        "message": result['data']['message'] ?? "Password reset failed"
+      };
+    }
+  }
+
+  // ============================
+  // EMAIL VERIFICATION METHODS
+  // ============================
+
+  // ----------------------------
+  // SEND VERIFICATION CODE
+  // ----------------------------
+  static Future<Map<String, dynamic>> sendVerificationCode(String email) async {
+    print('📧 Sending verification code to: $email');
+    
+    final result = await ApiService.postRequest("send-verification", {
+      "email": email,
+    });
+    
+    if (result['statusCode'] == 200) {
+      print('✅ Verification code sent!');
+      
+      // Simpan informasi verifikasi lokal
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_userEmailKey, email);
+      await prefs.setString(_verificationCodeExpiresKey, 
+        DateTime.now().add(Duration(minutes: 10)).toIso8601String());
+      
+      return {
+        "success": true,
+        "message": "Verification code sent to your email"
+      };
+    } else {
+      print('❌ Failed to send verification code: ${result['data']}');
+      return {
+        "success": false,
+        "message": result['data']['message'] ?? "Failed to send verification code"
+      };
+    }
   }
 
   // ----------------------------
-  // UPDATE MAHASISWA - IMPROVED
+  // VERIFY CODE
+  // ----------------------------
+  static Future<Map<String, dynamic>> verifyCode({
+    required String email,
+    required String code,
+  }) async {
+    print('🔐 Verifying code for: $email');
+    
+    final result = await ApiService.postRequest("verify-code", {
+      "email": email,
+      "code": code,
+    });
+    
+    if (result['statusCode'] == 200) {
+      print('✅ Email verified successfully!');
+      
+      // Update status verifikasi email di local storage
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_userEmailVerifiedKey, true);
+      await prefs.remove(_verificationCodeKey);
+      await prefs.remove(_verificationCodeExpiresKey);
+      
+      return {
+        "success": true,
+        "message": "Email verified successfully"
+      };
+    } else {
+      print('❌ Email verification failed: ${result['data']}');
+      return {
+        "success": false,
+        "message": result['data']['message'] ?? "Email verification failed"
+      };
+    }
+  }
+
+  // ============================
+  // PROFILE UPDATE METHODS
+  // ============================
+
+  // ----------------------------
+  // UPDATE MAHASISWA
   // ----------------------------
   static Future<Map<String, dynamic>> updateMahasiswa({
     required int id,
@@ -182,59 +372,46 @@ class AuthService {
     required String kelas,
     required String prodi,
   }) async {
-    final token = await getToken();
-
+    print('📝 Updating mahasiswa data - ID: $id, Nama: $nama');
+    
     final result = await ApiService.putRequest("mahasiswa/$id", {
       "nim": nim,
       "kelas": kelas,
       "prodi": prodi,
-    }, token: token);
+    });
 
     if (result['statusCode'] == 200) {
-      final prefs = await SharedPreferences.getInstance(); // MOVED THIS LINE OUTSIDE TRY BLOCK
+      final prefs = await SharedPreferences.getInstance();
 
       try {
-        // Debug response structure
-        print("📦 Struktur response:");
-        print("   - result: ${result.keys}");
-
-        // Handle berbagai kemungkinan struktur response
         dynamic responseData = _extractResponseData(result['data']);
 
-        print("🔍 Data dari response API:");
-        print("   - responseData: $responseData");
-
         if (responseData is Map) {
-          // Gunakan data dari API, fallback ke parameter jika tidak ada
-          await prefs.setString('mahasiswa_nim', (responseData['nim']?.toString() ?? nim));
-          await prefs.setString('mahasiswa_prodi', (responseData['prodi']?.toString() ?? prodi));
-          await prefs.setString('mahasiswa_kelas', (responseData['kelas']?.toString() ?? kelas));
-          await prefs.setString('mahasiswa_tahun_masuk', (responseData['tahunMasuk']?.toString() ?? ''));
+          await prefs.setString(_mahasiswaNimKey, (responseData['nim']?.toString() ?? nim));
+          await prefs.setString(_mahasiswaProdiKey, (responseData['prodi']?.toString() ?? prodi));
+          await prefs.setString(_mahasiswaKelasKey, (responseData['kelas']?.toString() ?? kelas));
+          await prefs.setString(_mahasiswaTahunMasukKey, (responseData['tahunMasuk']?.toString() ?? ''));
 
-          // Data tambahan dari response dengan type safety
           if (responseData['id'] != null) {
-            await prefs.setInt('mahasiswa_id', (responseData['id'] as num).toInt());
+            await prefs.setInt(_mahasiswaIdKey, (responseData['id'] as num).toInt());
           }
           if (responseData['userId'] != null) {
-            await prefs.setInt('user_id', (responseData['userId'] as num).toInt());
+            await prefs.setInt(_userIdKey, (responseData['userId'] as num).toInt());
           }
 
-          // Update user name juga
-          await prefs.setString('userName', nama);
-          await prefs.setString('mahasiswa_nama', nama);
+          await prefs.setString(_userNameKey, nama);
+          await prefs.setString(_mahasiswaNamaKey, nama);
 
-          print("✅ Berhasil update SharedPreferences dari API response");
+          print("✅ Mahasiswa data updated from API response");
         } else {
-          // Fallback ke parameter jika struktur tidak sesuai
-          print("⚠️ Struktur response tidak sesuai, menggunakan parameter sebagai fallback");
           await _fallbackSaveMahasiswa(nim, prodi, kelas);
-          await prefs.setString('userName', nama);
-          await prefs.setString('mahasiswa_nama', nama);
+          await prefs.setString(_userNameKey, nama);
+          await prefs.setString(_mahasiswaNamaKey, nama);
         }
       } catch (e) {
-        print("❌ Error update local mahasiswa: $e");
+        print("❌ Error updating local mahasiswa data: $e");
         await _fallbackSaveMahasiswa(nim, prodi, kelas);
-        await prefs.setString('userName', nama); // NOW prefs IS ACCESSIBLE HERE
+        await prefs.setString(_userNameKey, nama);
       }
     }
 
@@ -242,28 +419,27 @@ class AuthService {
   }
 
   // ----------------------------
-  // UPDATE USER - IMPROVED
+  // UPDATE USER
   // ----------------------------
   static Future<Map<String, dynamic>> updateUser({required int idu, required String nama}) async {
-    final token = await getToken();
-
+    print('👤 Updating user data - ID: $idu, Nama: $nama');
+    
     final resultuser = await ApiService.putRequest("user/$idu", {
       "name": nama,
-    }, token: token);
+    });
 
     if (resultuser['statusCode'] == 200) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('userName', nama);
+        await prefs.setString(_userNameKey, nama);
         
-        // Juga update nama di data mahasiswa jika ada
         if (await isMahasiswa()) {
-          await prefs.setString('mahasiswa_nama', nama);
+          await prefs.setString(_mahasiswaNamaKey, nama);
         }
         
         print("✅ User name updated to: $nama");
       } catch (e) {
-        print("❌ Error update local user: $e");
+        print("❌ Error updating local user data: $e");
       }
     }
 
@@ -271,82 +447,152 @@ class AuthService {
   }
 
   // ----------------------------
-  // UPDATE DOSEN (NEW METHOD)
+  // UPDATE DOSEN
   // ----------------------------
   static Future<Map<String, dynamic>> updateDosen({
     required int id,
     required String nama,
     required String nip,
   }) async {
-    final token = await getToken();
-
+    print('👨‍🏫 Updating dosen data - ID: $id, Nama: $nama');
+    
     final result = await ApiService.putRequest("dosen/$id", {
       "nama": nama,
       "nip": nip,
-    }, token: token);
+    });
 
     if (result['statusCode'] == 200) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('dosen_nama', nama);
-        await prefs.setString('dosen_nip', nip);
-        await prefs.setString('userName', nama); // Juga update user name
+        await prefs.setString(_dosenNamaKey, nama);
+        await prefs.setString(_dosenNipKey, nip);
+        await prefs.setString(_userNameKey, nama);
         
-        print("✅ Data dosen updated: $nama, NIP: $nip");
+        print("✅ Dosen data updated: $nama, NIP: $nip");
       } catch (e) {
-        print("❌ Error update local dosen: $e");
+        print("❌ Error updating local dosen data: $e");
       }
     }
 
     return result;
   }
 
+  // ============================
+  // TOKEN MANAGEMENT METHODS
+  // ============================
+
   // ----------------------------
-  // GET DATA LOCAL - IMPROVED
+  // GET TOKEN
   // ----------------------------
+  static Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(_tokenKey);
+    
+    if (token != null) {
+      if (await isTokenExpired()) {
+        print('⚠️ Token has expired, attempting refresh...');
+        final refreshResult = await refreshToken();
+        if (refreshResult['success'] == true) {
+          return refreshResult['token'];
+        } else {
+          await _clearAuthData(prefs);
+          return null;
+        }
+      }
+    }
+    
+    return token;
+  }
+
+  // ----------------------------
+  // CHECK TOKEN EXPIRY
+  // ----------------------------
+  static Future<bool> isTokenExpired() async {
+    final prefs = await SharedPreferences.getInstance();
+    final expiresAt = prefs.getString(_tokenExpiresKey);
+    
+    if (expiresAt == null) return true;
+    
+    try {
+      final expiryDate = DateTime.parse(expiresAt);
+      final isExpired = DateTime.now().isAfter(expiryDate.subtract(Duration(minutes: 5))); // 5 minutes buffer
+      
+      if (isExpired) {
+        print('🔐 Token expires at: $expiresAt');
+      }
+      
+      return isExpired;
+    } catch (e) {
+      print('❌ Error parsing token expiry: $e');
+      return true;
+    }
+  }
+
+  // ----------------------------
+  // VALIDATE TOKEN WITH SERVER
+  // ----------------------------
+  static Future<bool> validateToken() async {
+    if (!await isLoggedIn()) {
+      return false;
+    }
+
+    try {
+      final response = await checkToken();
+      final isValid = response['success'] == true && response['valid'] == true;
+      
+      if (!isValid) {
+        print('❌ Token validation failed');
+        await logout();
+      }
+      
+      return isValid;
+    } catch (e) {
+      print('❌ Token validation error: $e');
+      return false;
+    }
+  }
+
+  // ============================
+  // USER DATA GETTERS
+  // ============================
+
   static Future<String?> getUserName() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('userName');
+    return prefs.getString(_userNameKey);
   }
 
   static Future<String?> getUserEmail() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('userEmail');
+    return prefs.getString(_userEmailKey);
   }
 
   static Future<String?> getUserRole() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('userRole');
-  }
-
-  static Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
+    return prefs.getString(_userRoleKey);
   }
 
   static Future<int?> getUserId() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('user_id');
+    return prefs.getInt(_userIdKey);
   }
 
   static Future<bool> isEmailVerified() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('userEmailVerified') ?? false;
+    return prefs.getBool(_userEmailVerifiedKey) ?? false;
   }
 
   static Future<Map<String, dynamic>> getUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    final String? role = prefs.getString('userRole');
+    final String? role = prefs.getString(_userRoleKey);
     
     Map<String, dynamic> userData = {
-      "id": prefs.getInt('user_id'),
-      "name": prefs.getString('userName') ?? '',
-      "email": prefs.getString('userEmail') ?? '',
+      "id": prefs.getInt(_userIdKey),
+      "name": prefs.getString(_userNameKey) ?? '',
+      "email": prefs.getString(_userEmailKey) ?? '',
       "role": role ?? '',
-      "email_verified": prefs.getBool('userEmailVerified') ?? false,
+      "email_verified": prefs.getBool(_userEmailVerifiedKey) ?? false,
     };
 
-    // Tambahkan data spesifik role
     if (role == 'mahasiswa') {
       final mahasiswa = await getMahasiswa();
       userData.addAll({'mahasiswa': mahasiswa});
@@ -361,34 +607,37 @@ class AuthService {
   static Future<Map<String, dynamic>> getMahasiswa() async {
     final prefs = await SharedPreferences.getInstance();
     return {
-      "id": prefs.getInt('mahasiswa_id') ?? 0,
-      "userId": prefs.getInt('mahasiswa_user') ?? 0,
-      "nama": prefs.getString('userName') ?? '',
-      "nim": prefs.getString('mahasiswa_nim') ?? '',
-      "kelas": prefs.getString('mahasiswa_kelas') ?? '',
-      "prodi": prefs.getString('mahasiswa_prodi') ?? '',
-      "diploma": prefs.getString('mahasiswa_diploma') ?? '',
-      "tahunMasuk": prefs.getString('mahasiswa_tahun_masuk') ?? '',
-      "nomorProdi": prefs.getInt('mahasiswa_nomor_prodi') ?? 0,
+      "id": prefs.getInt(_mahasiswaIdKey) ?? 0,
+      "userId": prefs.getInt(_mahasiswaUserIdKey) ?? 0,
+      "nama": prefs.getString(_mahasiswaNamaKey) ?? prefs.getString(_userNameKey) ?? '',
+      "nim": prefs.getString(_mahasiswaNimKey) ?? '',
+      "kelas": prefs.getString(_mahasiswaKelasKey) ?? '',
+      "prodi": prefs.getString(_mahasiswaProdiKey) ?? '',
+      "diploma": prefs.getString(_mahasiswaDiplomaKey) ?? '',
+      "tahunMasuk": prefs.getString(_mahasiswaTahunMasukKey) ?? '',
+      "nomorProdi": prefs.getInt(_mahasiswaNomorProdiKey) ?? 0,
     };
   }
 
   static Future<Map<String, dynamic>> getDosen() async {
     final prefs = await SharedPreferences.getInstance();
     return {
-      "id": prefs.getInt('dosen_id') ?? 0,
-      "userId": prefs.getInt('dosen_user') ?? 0,
-      "nama": prefs.getString('dosen_nama') ?? prefs.getString('userName') ?? '',
-      "nip": prefs.getString('dosen_nip') ?? '',
+      "id": prefs.getInt(_dosenIdKey) ?? 0,
+      "userId": prefs.getInt(_dosenUserIdKey) ?? 0,
+      "nama": prefs.getString(_dosenNamaKey) ?? prefs.getString(_userNameKey) ?? '',
+      "nip": prefs.getString(_dosenNipKey) ?? '',
     };
   }
 
-  // ----------------------------
-  // UTILITY METHODS - IMPROVED
-  // ----------------------------
+  // ============================
+  // UTILITY METHODS
+  // ============================
+
   static Future<bool> isLoggedIn() async {
     final token = await getToken();
-    return token != null && token.isNotEmpty;
+    final isLoggedIn = token != null && token.isNotEmpty;
+    print('🔐 Login status: $isLoggedIn');
+    return isLoggedIn;
   }
 
   static Future<bool> isMahasiswa() async {
@@ -398,7 +647,7 @@ class AuthService {
 
   static Future<bool> hasMahasiswaData() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('mahasiswa_id') != null;
+    return prefs.getInt(_mahasiswaIdKey) != null;
   }
 
   static Future<bool> isDosen() async {
@@ -408,10 +657,9 @@ class AuthService {
 
   static Future<bool> hasDosenData() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt('dosen_id') != null;
+    return prefs.getInt(_dosenIdKey) != null;
   }
 
-  // NEW: Get complete user profile based on role
   static Future<Map<String, dynamic>> getCompleteUserProfile() async {
     final userData = await getUserData();
     final String? role = await getUserRole();
@@ -427,7 +675,6 @@ class AuthService {
     return {...userData, 'profile_type': 'user'};
   }
 
-  // NEW: Check if user has complete profile
   static Future<bool> hasCompleteProfile() async {
     final String? role = await getUserRole();
     
@@ -438,18 +685,163 @@ class AuthService {
              mahasiswa['prodi']?.isNotEmpty == true;
     } else if (role == 'dosen') {
       final dosen = await getDosen();
-      return dosen['nama']?.isNotEmpty == true;
+      return dosen['nama']?.isNotEmpty == true && 
+             dosen['nip']?.isNotEmpty == true;
     }
     
     return true;
   }
 
-  // ----------------------------
-  // LOGOUT
-  // ----------------------------
-  static Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    print("✅ User logged out, all data cleared");
+  // ============================
+  // TEST SERVER CONNECTION
+  // ============================
+  static Future<Map<String, dynamic>> testServerConnection() async {
+    print('🌐 Testing server connection...');
+    
+    try {
+      final response = await ApiService.getRequest('test-time');
+      
+      if (response['statusCode'] == 200) {
+        print('✅ Server connection successful');
+        return {
+          "success": true,
+          "server_time": response['data']['server_time'],
+          "timezone": response['data']['timezone']
+        };
+      } else {
+        print('❌ Server connection failed: ${response['statusCode']}');
+        return {
+          "success": false,
+          "message": "Server connection failed"
+        };
+      }
+    } catch (e) {
+      print('❌ Server connection error: $e');
+      return {
+        "success": false,
+        "message": "Server connection error: $e"
+      };
+    }
+  }
+
+  // ============================
+  // PRIVATE HELPER METHODS
+  // ============================
+
+  static Future<void> _saveUserData(
+    Map<String, dynamic> userData, 
+    String token, 
+    String tokenExpiresAt, 
+    SharedPreferences prefs
+  ) async {
+    await prefs.setInt(_userIdKey, userData['id']);
+    await prefs.setString(_userNameKey, userData['name']);
+    await prefs.setString(_userEmailKey, userData['email']);
+    await prefs.setString(_userRoleKey, userData['role']);
+    await prefs.setBool(_userEmailVerifiedKey, userData['email_verified'] ?? false);
+    await prefs.setString(_tokenKey, token);
+    await prefs.setString(_tokenExpiresKey, tokenExpiresAt);
+  }
+
+  static Future<void> _saveMahasiswaData(Map<String, dynamic> mahasiswa, SharedPreferences prefs) async {
+    await prefs.setInt(_mahasiswaIdKey, mahasiswa['id'] ?? 0);
+    await prefs.setInt(_mahasiswaUserIdKey, mahasiswa['userId'] ?? 0);
+    await prefs.setString(_mahasiswaNimKey, mahasiswa['nim']?.toString() ?? '');
+    await prefs.setString(_mahasiswaKelasKey, mahasiswa['kelas']?.toString() ?? '');
+    await prefs.setString(_mahasiswaProdiKey, mahasiswa['prodi']?.toString() ?? '');
+    await prefs.setString(_mahasiswaDiplomaKey, mahasiswa['diploma']?.toString() ?? '');
+    await prefs.setString(_mahasiswaTahunMasukKey, mahasiswa['tahunMasuk']?.toString() ?? '');
+    await prefs.setInt(_mahasiswaNomorProdiKey, mahasiswa['nomorProdi'] ?? 0);
+    await prefs.setString(_mahasiswaNamaKey, mahasiswa['nama']?.toString() ?? '');
+  }
+
+  static Future<void> _saveDosenData(Map<String, dynamic> dosen, SharedPreferences prefs) async {
+    await prefs.setInt(_dosenIdKey, dosen['id'] ?? 0);
+    await prefs.setInt(_dosenUserIdKey, dosen['userId'] ?? 0);
+    await prefs.setString(_dosenNamaKey, dosen['nama']?.toString() ?? '');
+    await prefs.setString(_dosenNipKey, dosen['nip']?.toString() ?? '');
+  }
+
+  static Future<void> _cleanupRoleData(String role, SharedPreferences prefs) async {
+    if (role == 'mahasiswa') {
+      await prefs.remove(_dosenIdKey);
+      await prefs.remove(_dosenUserIdKey);
+      await prefs.remove(_dosenNamaKey);
+      await prefs.remove(_dosenNipKey);
+    } else if (role == 'dosen') {
+      await prefs.remove(_mahasiswaIdKey);
+      await prefs.remove(_mahasiswaUserIdKey);
+      await prefs.remove(_mahasiswaNimKey);
+      await prefs.remove(_mahasiswaKelasKey);
+      await prefs.remove(_mahasiswaProdiKey);
+      await prefs.remove(_mahasiswaDiplomaKey);
+      await prefs.remove(_mahasiswaTahunMasukKey);
+      await prefs.remove(_mahasiswaNomorProdiKey);
+      await prefs.remove(_mahasiswaNamaKey);
+    }
+  }
+
+  static Future<void> _clearAuthData(SharedPreferences prefs) async {
+    await prefs.remove(_tokenKey);
+    await prefs.remove(_tokenExpiresKey);
+    await prefs.remove(_userIdKey);
+    await prefs.remove(_userNameKey);
+    await prefs.remove(_userEmailKey);
+    await prefs.remove(_userRoleKey);
+    await prefs.remove(_userEmailVerifiedKey);
+    await prefs.remove(_verificationCodeKey);
+    await prefs.remove(_verificationCodeExpiresKey);
+    
+    // Clear role-specific data
+    await prefs.remove(_mahasiswaIdKey);
+    await prefs.remove(_mahasiswaUserIdKey);
+    await prefs.remove(_mahasiswaNimKey);
+    await prefs.remove(_mahasiswaKelasKey);
+    await prefs.remove(_mahasiswaProdiKey);
+    await prefs.remove(_mahasiswaDiplomaKey);
+    await prefs.remove(_mahasiswaTahunMasukKey);
+    await prefs.remove(_mahasiswaNomorProdiKey);
+    await prefs.remove(_mahasiswaNamaKey);
+    
+    await prefs.remove(_dosenIdKey);
+    await prefs.remove(_dosenUserIdKey);
+    await prefs.remove(_dosenNamaKey);
+    await prefs.remove(_dosenNipKey);
+  }
+
+  static Map<String, dynamic> _convertToStringMap(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      return data;
+    } else if (data is Map<dynamic, dynamic>) {
+      return data.cast<String, dynamic>();
+    } else if (data is Map) {
+      final result = <String, dynamic>{};
+      data.forEach((key, value) {
+        result[key.toString()] = value;
+      });
+      return result;
+    }
+    return {};
+  }
+
+  static dynamic _extractResponseData(dynamic data) {
+    if (data is Map && data.containsKey('data')) {
+      return data['data'];
+    } else if (data is Map) {
+      return data;
+    }
+    return data;
+  }
+
+  static Future<void> _fallbackSaveMahasiswa(String nim, String prodi, String kelas) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_mahasiswaNimKey, nim);
+      await prefs.setString(_mahasiswaProdiKey, prodi);
+      await prefs.setString(_mahasiswaKelasKey, kelas);
+      print("✅ Fallback: SharedPreferences updated using parameters");
+    } catch (fallbackError) {
+      print("❌ Fallback also failed: $fallbackError");
+    }
   }
 }

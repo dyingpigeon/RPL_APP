@@ -3,21 +3,33 @@ import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.18.21:8000/api/v1';
+  static const String baseUrl = 'http://192.168.18.21:8000/api/v2';
   // static const String baseUrl = 'https://ecd08a6c5ece.ngrok-free.app/api/v1';
 
-  // Helper POST request
+  // Helper method untuk mendapatkan token dengan fallback ke AuthService
+  static Future<String?> _getToken({String? token}) async {
+    return token ?? await AuthService.getToken();
+  }
+
+  // Helper POST request dengan token otomatis
   static Future<Map<String, dynamic>> postRequest(String endpoint, Map<String, String> body, {String? token}) async {
     final url = Uri.parse("$baseUrl/$endpoint");
+    final String? finalToken = await _getToken(token: token);
 
     print('🌐 API POST: $url');
     print('📤 Request Body: $body');
-    print('🔑 Token: ${token != null ? "Yes" : "No"}');
+    print('🔑 Token: ${finalToken != null ? "Yes" : "No"}');
+    if (finalToken != null) {
+      print('🔐 Token Value: Bearer $finalToken');
+    }
 
     try {
       final response = await http.post(
         url,
-        headers: {"Content-Type": "application/json", if (token != null) "Authorization": "Bearer $token"},
+        headers: {
+          "Content-Type": "application/json",
+          if (finalToken != null && finalToken.isNotEmpty) "Authorization": "Bearer $finalToken",
+        },
         body: jsonEncode(body),
       );
 
@@ -46,13 +58,13 @@ class ApiService {
     }
   }
 
-  // Helper GET request dengan support query parameters
+  // Helper GET request dengan support query parameters dan token otomatis
   static Future<Map<String, dynamic>> getRequest(
     String endpoint, {
     Map<String, String>? queryParams,
     String? token,
   }) async {
-    final String? finalToken = token ?? await AuthService.getToken();
+    final String? finalToken = await _getToken(token: token);
 
     Uri url;
     if (queryParams != null && queryParams.isNotEmpty) {
@@ -63,6 +75,9 @@ class ApiService {
 
     print('🌐 API GET: $url');
     print('🔑 Token: ${finalToken != null ? "Yes" : "No"}');
+    if (finalToken != null) {
+      print('🔐 Token Value: Bearer $finalToken');
+    }
     if (queryParams != null && queryParams.isNotEmpty) {
       print('🔍 Query Params: $queryParams');
     }
@@ -118,18 +133,25 @@ class ApiService {
     }
   }
 
-  // Helper PUT request
+  // Helper PUT request dengan token otomatis
   static Future<Map<String, dynamic>> putRequest(String endpoint, Map<String, String> body, {String? token}) async {
     final url = Uri.parse("$baseUrl/$endpoint");
+    final String? finalToken = await _getToken(token: token);
 
     print('🌐 API PUT: $url');
     print('📤 Request Body: $body');
-    print('🔑 Token: ${token != null ? "Yes" : "No"}');
+    print('🔑 Token: ${finalToken != null ? "Yes" : "No"}');
+    if (finalToken != null) {
+      print('🔐 Token Value: Bearer $finalToken');
+    }
 
     try {
       final response = await http.put(
         url,
-        headers: {"Content-Type": "application/json", if (token != null) "Authorization": "Bearer $token"},
+        headers: {
+          "Content-Type": "application/json",
+          if (finalToken != null && finalToken.isNotEmpty) "Authorization": "Bearer $finalToken",
+        },
         body: jsonEncode(body),
       );
 
@@ -158,13 +180,13 @@ class ApiService {
     }
   }
 
-  // Helper DELETE request
+  // Helper DELETE request dengan token otomatis
   static Future<Map<String, dynamic>> deleteRequest(
     String endpoint, {
     Map<String, String>? queryParams,
     String? token,
   }) async {
-    final String? finalToken = token ?? await AuthService.getToken();
+    final String? finalToken = await _getToken(token: token);
 
     Uri url;
     if (queryParams != null && queryParams.isNotEmpty) {
@@ -175,6 +197,9 @@ class ApiService {
 
     print('🌐 API DELETE: $url');
     print('🔑 Token: ${finalToken != null ? "Yes" : "No"}');
+    if (finalToken != null) {
+      print('🔐 Token Value: Bearer $finalToken');
+    }
 
     try {
       final response = await http.delete(
@@ -203,6 +228,53 @@ class ApiService {
       return {"statusCode": response.statusCode, "data": responseData};
     } catch (e) {
       print('💥 DELETE API Error: $e');
+      return {
+        "statusCode": 500,
+        "data": {"message": "Terjadi kesalahan koneksi: $e"},
+      };
+    }
+  }
+
+  // NEW: PATCH request dengan token otomatis
+  static Future<Map<String, dynamic>> patchRequest(String endpoint, Map<String, dynamic> body, {String? token}) async {
+    final url = Uri.parse("$baseUrl/$endpoint");
+    final String? finalToken = await _getToken(token: token);
+
+    print('🌐 API PATCH: $url');
+    print('📤 Request Body: $body');
+    print('🔑 Token: ${finalToken != null ? "Yes" : "No"}');
+    if (finalToken != null) {
+      print('🔐 Token Value: Bearer $finalToken');
+    }
+
+    try {
+      final response = await http.patch(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          if (finalToken != null && finalToken.isNotEmpty) "Authorization": "Bearer $finalToken",
+        },
+        body: jsonEncode(body),
+      );
+
+      print('📡 PATCH Response Status: ${response.statusCode}');
+      print('📦 PATCH Response Headers: ${response.headers}');
+      print('📄 PATCH Response Body: ${response.body}');
+
+      // Cek jika response bukan JSON - FIXED NULL CHECK
+      final contentType = response.headers['content-type'];
+      if (contentType == null || !contentType.contains('application/json')) {
+        print('⚠️ PATCH Response is not JSON');
+        return {
+          "statusCode": response.statusCode,
+          "data": {"message": "Server returned non-JSON response"},
+        };
+      }
+
+      final responseData = jsonDecode(response.body);
+      return {"statusCode": response.statusCode, "data": responseData};
+    } catch (e) {
+      print('💥 PATCH API Error: $e');
       return {
         "statusCode": 500,
         "data": {"message": "Terjadi kesalahan koneksi: $e"},

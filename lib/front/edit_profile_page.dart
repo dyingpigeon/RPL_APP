@@ -31,7 +31,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     print("===============================");
   }
 
-  int _selectedIndex = 2;
+  // int _selectedIndex = 2;
 
   // Controller untuk form
   final TextEditingController _namaController = TextEditingController();
@@ -308,19 +308,19 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   // Bottom nav
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+  // void _onItemTapped(int index) {
+  //   setState(() {
+  //     _selectedIndex = index;
+  //   });
 
-    if (index == 0) {
-      Navigator.pushReplacementNamed(context, '/home');
-    } else if (index == 1) {
-      Navigator.pushReplacementNamed(context, '/class');
-    } else if (index == 2) {
-      // Tetap di ProfilePage
-    }
-  }
+  //   if (index == 0) {
+  //     Navigator.pushReplacementNamed(context, '/home');
+  //   } else if (index == 1) {
+  //     Navigator.pushReplacementNamed(context, '/class');
+  //   } else if (index == 2) {
+  //     // Tetap di ProfilePage
+  //   }
+  // }
 
   // Logout dialog
   void _showLogoutDialog() {

@@ -32,39 +32,45 @@ class _ClassDetailState extends State<ClassDetail> {
   @override
   void initState() {
     super.initState();
+    print("🚀 ClassDetail initState - className: ${widget.className}, jadwalId: ${widget.jadwalId}");
     _loadUserData();
     _loadPostingan();
     _loadNamaDosen();
   }
 
-  // METHOD BARU: Load data user
+  // METHOD: Load data user
   Future<void> _loadUserData() async {
     try {
+      print("🔍 START _loadUserData");
       final role = await AuthService.getUserRole();
       final name = await AuthService.getUserName();
-      
+
+      print("📊 User data - Role: $role, Name: $name");
+
       if (mounted) {
         setState(() {
           _userRole = role ?? 'mahasiswa';
           _userName = name ?? 'User';
         });
       }
+      print("✅ _loadUserData completed - Role: $_userRole, Name: $_userName");
     } catch (e) {
-      print("Error loading user data: $e");
+      print("❌ ERROR in _loadUserData: $e");
     }
   }
 
   Future<void> _loadPostingan() async {
     try {
+      print("🔄 START _loadPostingan - jadwalId: ${widget.jadwalId}");
       setState(() {
         _isLoading = true;
         _errorMessage = '';
       });
 
-      final postingan = await PostinganService.getPostingan(
-        dosenId: widget.dosenId, 
-        jadwalId: widget.jadwalId
-      );
+      // MENYESUAIKAN: Gunakan method getPostinganByJadwal yang baru
+      final postingan = await PostinganService.getPostinganByJadwal(jadwalId: widget.jadwalId);
+
+      print("📊 _loadPostingan - Received ${postingan.length} postingan");
 
       if (mounted) {
         setState(() {
@@ -72,7 +78,9 @@ class _ClassDetailState extends State<ClassDetail> {
           _isLoading = false;
         });
       }
+      print("✅ _loadPostingan completed - ${_postinganList.length} postingan loaded");
     } catch (e) {
+      print("❌ ERROR in _loadPostingan: $e");
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -84,13 +92,18 @@ class _ClassDetailState extends State<ClassDetail> {
 
   Future<void> _loadNamaDosen() async {
     try {
+      print("🔍 START _loadNamaDosen - dosenId: ${widget.dosenId}");
       final nama = await DosenService.getNamaDosen(widget.dosenId);
+      print("📊 Dosen name received: $nama");
+
       if (mounted) {
         setState(() {
           _namaDosen = nama;
         });
       }
+      print("✅ _loadNamaDosen completed - Nama: $_namaDosen");
     } catch (e) {
+      print("❌ ERROR in _loadNamaDosen: $e");
       if (mounted) {
         setState(() {
           _namaDosen = 'Dosen Tidak Diketahui';
@@ -99,84 +112,124 @@ class _ClassDetailState extends State<ClassDetail> {
     }
   }
 
-  // METHOD BARU: Create postingan (untuk dosen)
+  // METHOD: Create postingan (untuk dosen)
   Future<void> _createPostingan() async {
-    final TextEditingController captionController = TextEditingController();
-    
+    print("🚀 START _createPostingan - userRole: $_userRole");
+
+    if (_userRole != 'dosen') {
+      print("⚠️ Only dosen can create postingan");
+      return;
+    }
+
+    final TextEditingController judulController = TextEditingController();
+    final TextEditingController kontenController = TextEditingController();
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Buat Pengumuman'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Kelas: ${widget.className}',
-              style: const TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: captionController,
-              decoration: const InputDecoration(
-                hintText: 'Masukkan pengumuman...',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Buat Pengumuman'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Kelas: ${widget.className}', style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: judulController,
+                    decoration: const InputDecoration(
+                      labelText: 'Judul Pengumuman',
+                      hintText: 'Masukkan judul pengumuman...',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    maxLines: 1,
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: kontenController,
+                    decoration: const InputDecoration(
+                      labelText: 'Isi Pengumuman',
+                      hintText: 'Masukkan isi pengumuman...',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                    maxLines: 4,
+                    textInputAction: TextInputAction.done,
+                  ),
+                ],
               ),
-              maxLines: 4,
-              textInputAction: TextInputAction.done,
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final caption = captionController.text.trim();
-              if (caption.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Pengumuman tidak boleh kosong'))
-                );
-                return;
-              }
+            actions: [
+              TextButton(
+                onPressed: () {
+                  print("❌ Create postingan cancelled");
+                  Navigator.pop(context);
+                },
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final judul = judulController.text.trim();
+                  final konten = kontenController.text.trim();
 
-              Navigator.pop(context);
-              await _submitPostingan(caption);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFB71C1C),
-            ),
-            child: const Text('Buat', style: TextStyle(color: Colors.white)),
+                  print("📝 Validating postingan - Judul: $judul, Konten: $konten");
+
+                  if (judul.isEmpty || konten.isEmpty) {
+                    print("⚠️ Validation failed - judul or konten is empty");
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('Judul dan isi pengumuman tidak boleh kosong')));
+                    return;
+                  }
+
+                  print("✅ Validation passed, proceeding with submission");
+                  Navigator.pop(context);
+                  await _submitPostingan(judul, konten);
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFB71C1C)),
+                child: const Text('Buat', style: TextStyle(color: Colors.white)),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
-  Future<void> _submitPostingan(String caption) async {
+  Future<void> _submitPostingan(String judul, String konten) async {
+    print("🚀 START _submitPostingan - Judul: $judul");
     try {
       setState(() {
         _isLoading = true;
       });
 
-      await PostinganService.createPostingan(
-        dosenId: widget.dosenId,
+      // MENYESUAIKAN: Gunakan method createPostingan yang baru
+      final result = await PostinganService.createPostingan(
         jadwalId: widget.jadwalId,
-        caption: caption,
+        judul: judul,
+        konten: konten,
+        // dosenId akan otomatis diambil dari service
       );
 
-      // Refresh list setelah create
-      await _loadPostingan();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pengumuman berhasil dibuat'))
-      );
+      print("📡 _submitPostingan response - Success: ${result['success']}, Message: ${result['message']}");
+
+      if (result['success'] == true) {
+        // Refresh list setelah create
+        await _loadPostingan();
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Pengumuman berhasil dibuat')));
+        print("✅ Postingan created successfully");
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Gagal membuat pengumuman')));
+        print("❌ Postingan creation failed");
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal membuat pengumuman: $e'))
-      );
+      print("❌ ERROR in _submitPostingan: $e");
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal membuat pengumuman: $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -187,61 +240,76 @@ class _ClassDetailState extends State<ClassDetail> {
   }
 
   Future<void> _deletePostingan(int postinganId) async {
+    print("🚀 START _deletePostingan - postinganId: $postinganId");
     try {
-      final success = await PostinganService.deletePostingan(
-        postinganId: postinganId,
-        dosenId: widget.dosenId,
-        jadwalId: widget.jadwalId,
-      );
+      // MENYESUAIKAN: Gunakan method deletePostingan yang baru
+      final result = await PostinganService.deletePostingan(postinganId: postinganId);
 
-      if (success) {
+      print("📡 _deletePostingan response - Success: ${result['success']}, Message: ${result['message']}");
+
+      if (result['success'] == true) {
         // Refresh list setelah delete
         _loadPostingan();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Postingan berhasil dihapus'))
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Postingan berhasil dihapus')));
+        print("✅ Postingan deleted successfully");
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Gagal menghapus postingan')));
+        print("❌ Postingan deletion failed");
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menghapus postingan: $e'))
-      );
+      print("❌ ERROR in _deletePostingan: $e");
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menghapus postingan: $e')));
     }
   }
 
-  void _showDeleteConfirmation(int postinganId, String caption) {
+  void _showDeleteConfirmation(int postinganId, String judul) {
+    print("🚀 START _showDeleteConfirmation - postinganId: $postinganId");
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hapus Postingan'),
-        content: Text(
-          'Apakah Anda yakin ingin menghapus postingan: "${caption.length > 50 ? '${caption.substring(0, 50)}...' : caption}"?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context), 
-            child: const Text('Batal')
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Hapus Postingan'),
+            content: Text(
+              'Apakah Anda yakin ingin menghapus postingan: "${judul.length > 50 ? '${judul.substring(0, 50)}...' : judul}"?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  print("❌ Delete cancelled");
+                  Navigator.pop(context);
+                },
+                child: const Text('Batal'),
+              ),
+              TextButton(
+                onPressed: () {
+                  print("✅ Delete confirmed");
+                  Navigator.pop(context);
+                  _deletePostingan(postinganId);
+                },
+                child: const Text('Hapus', style: TextStyle(color: Colors.red)),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deletePostingan(postinganId);
-            },
-            child: const Text('Hapus', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
     );
   }
 
-  // METHOD BARU: Refresh data
+  // METHOD: Refresh data
   Future<void> _refreshData() async {
+    print("🔄 START _refreshData");
     await _loadPostingan();
     await _loadNamaDosen();
+    print("✅ _refreshData completed");
   }
 
   @override
   Widget build(BuildContext context) {
     final Color primaryRed = const Color(0xFFB71C1C);
+
+    print("🎨 Building ClassDetail UI - isLoading: $_isLoading, postinganCount: ${_postinganList.length}");
 
     return Scaffold(
       appBar: AppBar(
@@ -249,25 +317,34 @@ class _ClassDetailState extends State<ClassDetail> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            print("🔙 Navigating back");
+            Navigator.pop(context);
+          },
         ),
         title: Text(
-          widget.className, 
+          widget.className,
           style: const TextStyle(color: Colors.black, fontSize: 18),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black), 
-            onPressed: _refreshData,
+            icon: const Icon(Icons.refresh, color: Colors.black),
+            onPressed: () {
+              print("🔄 Manual refresh triggered");
+              _refreshData();
+            },
             tooltip: 'Refresh',
           ),
           // TOMBOL TAMBAH UNTUK DOSEN
           if (_userRole == 'dosen')
             IconButton(
               icon: const Icon(Icons.add, color: Colors.black),
-              onPressed: _createPostingan,
+              onPressed: () {
+                print("➕ Create postingan button pressed");
+                _createPostingan();
+              },
               tooltip: 'Buat Pengumuman',
             ),
         ],
@@ -293,10 +370,7 @@ class _ClassDetailState extends State<ClassDetail> {
                     Container(
                       width: 50,
                       height: 50,
-                      decoration: BoxDecoration(
-                        color: primaryRed,
-                        borderRadius: BorderRadius.circular(25),
-                      ),
+                      decoration: BoxDecoration(color: primaryRed, borderRadius: BorderRadius.circular(25)),
                       child: const Icon(Icons.school, color: Colors.white, size: 24),
                     ),
                     const SizedBox(width: 12),
@@ -305,23 +379,25 @@ class _ClassDetailState extends State<ClassDetail> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.className, 
+                            widget.className,
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            widget.schedule, 
-                            style: const TextStyle(color: Colors.grey, fontSize: 13),
-                          ),
+                          Text(widget.schedule, style: const TextStyle(color: Colors.grey, fontSize: 13)),
                           const SizedBox(height: 2),
                           Text(
-                            _userRole == 'dosen' 
-                              ? 'Anda adalah pengajar' 
-                              : 'Dosen: $_namaDosen',
+                            _userRole == 'dosen' ? 'Anda adalah pengajar' : 'Dosen: $_namaDosen',
                             style: const TextStyle(color: Colors.grey, fontSize: 12),
                           ),
+                          if (_userRole == 'dosen') ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'ID Dosen: ${widget.dosenId}',
+                              style: const TextStyle(color: Colors.grey, fontSize: 10),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -348,7 +424,7 @@ class _ClassDetailState extends State<ClassDetail> {
               const SizedBox(height: 16),
 
               // Loading state
-              if (_isLoading) 
+              if (_isLoading)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 40),
                   child: Center(child: CircularProgressIndicator()),
@@ -371,11 +447,7 @@ class _ClassDetailState extends State<ClassDetail> {
                       const SizedBox(height: 10),
                       Text(
                         'Terjadi Kesalahan',
-                        style: TextStyle(
-                          color: Colors.red[800],
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
+                        style: TextStyle(color: Colors.red[800], fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -385,11 +457,11 @@ class _ClassDetailState extends State<ClassDetail> {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: _refreshData, 
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                        ),
+                        onPressed: () {
+                          print("🔄 Retry button pressed from error state");
+                          _refreshData();
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                         child: const Text('Coba Lagi'),
                       ),
                     ],
@@ -409,41 +481,34 @@ class _ClassDetailState extends State<ClassDetail> {
                   ),
                   child: Column(
                     children: [
-                      Icon(
-                        Icons.announcement_outlined,
-                        size: 64,
-                        color: Colors.grey[400],
-                      ),
+                      Icon(Icons.announcement_outlined, size: 64, color: Colors.grey[400]),
                       const SizedBox(height: 16),
                       Text(
-                        _userRole == 'dosen' 
-                          ? "Belum ada pengumuman"
-                          : "Belum ada pengumuman untuk kelas ini",
+                        _userRole == 'dosen' ? "Belum ada pengumuman" : "Belum ada pengumuman untuk kelas ini",
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.grey[600], 
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: TextStyle(color: Colors.grey[600], fontSize: 16, fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         _userRole == 'dosen'
-                          ? "Buat pengumuman pertama untuk menginformasikan hal penting kepada mahasiswa"
-                          : "Dosen akan memposting pengumuman penting di sini",
+                            ? "Buat pengumuman pertama untuk menginformasikan hal penting kepada mahasiswa"
+                            : "Dosen akan memposting pengumuman penting di sini",
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.grey[500], fontSize: 14),
                       ),
                       if (_userRole == 'dosen') ...[
                         const SizedBox(height: 20),
                         ElevatedButton(
-                          onPressed: _createPostingan,
+                          onPressed: () {
+                            print("➕ Create first postingan button pressed");
+                            _createPostingan();
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryRed,
                             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                           ),
                           child: const Text(
-                            'Buat Pengumuman Pertama', 
+                            'Buat Pengumuman Pertama',
                             style: TextStyle(color: Colors.white, fontSize: 14),
                           ),
                         ),
@@ -455,15 +520,17 @@ class _ClassDetailState extends State<ClassDetail> {
               // List announcements dari API
               if (!_isLoading && _errorMessage.isEmpty && _postinganList.isNotEmpty)
                 Column(
-                  children: _postinganList.map(
-                    (postingan) => _buildAnnouncementItem(
-                      postingan: postingan,
-                      canDelete: _userRole == 'dosen', // Hanya dosen yang bisa hapus
-                      onDelete: () => _showDeleteConfirmation(postingan.id, postingan.caption),
-                    ),
-                  ).toList(),
+                  children:
+                      _postinganList.map((postingan) {
+                        print("🎨 Building postingan item: ${postingan.judul}");
+                        return _buildAnnouncementItem(
+                          postingan: postingan,
+                          canDelete: _userRole == 'dosen', // Hanya dosen yang bisa hapus
+                          onDelete: () => _showDeleteConfirmation(postingan.id, postingan.judul),
+                        );
+                      }).toList(),
                 ),
-              
+
               const SizedBox(height: 20),
             ],
           ),
@@ -479,8 +546,10 @@ class _ClassDetailState extends State<ClassDetail> {
   }) {
     final Color primaryRed = const Color(0xFFB71C1C);
 
-    // Format tanggal dari created_at atau gunakan default
+    // Format tanggal dari created_at
     final date = _formatDate(postingan);
+
+    print("🎨 Building announcement item: ${postingan.judul}");
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -489,13 +558,7 @@ class _ClassDetailState extends State<ClassDetail> {
         color: Colors.white,
         border: Border.all(color: primaryRed.withOpacity(0.3), width: 1.5),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -507,15 +570,8 @@ class _ClassDetailState extends State<ClassDetail> {
               Container(
                 width: 36,
                 height: 36,
-                decoration: BoxDecoration(
-                  color: primaryRed,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Icon(
-                  canDelete ? Icons.person : Icons.school,
-                  color: Colors.white,
-                  size: 18,
-                ),
+                decoration: BoxDecoration(color: primaryRed, borderRadius: BorderRadius.circular(18)),
+                child: Icon(canDelete ? Icons.person : Icons.school, color: Colors.white, size: 18),
               ),
               const SizedBox(width: 12),
 
@@ -524,15 +580,9 @@ class _ClassDetailState extends State<ClassDetail> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _namaDosen,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                    ),
+                    Text(_namaDosen, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
-                    Text(
-                      date,
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
+                    Text(date, style: const TextStyle(color: Colors.grey, fontSize: 12)),
                   ],
                 ),
               ),
@@ -541,7 +591,10 @@ class _ClassDetailState extends State<ClassDetail> {
               if (canDelete)
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red, size: 22),
-                  onPressed: onDelete,
+                  onPressed: () {
+                    print("🗑️ Delete button pressed for postingan: ${postingan.id}");
+                    onDelete();
+                  },
                   padding: const EdgeInsets.all(4),
                   constraints: const BoxConstraints(),
                   tooltip: 'Hapus Pengumuman',
@@ -552,62 +605,43 @@ class _ClassDetailState extends State<ClassDetail> {
           const SizedBox(height: 12),
 
           // Garis pemisah
-          Container(
-            height: 1,
-            color: Colors.grey[200],
-          ),
+          Container(height: 1, color: Colors.grey[200]),
 
           const SizedBox(height: 12),
 
-          // Caption/isi pengumuman
+          // Judul pengumuman
           Text(
-            postingan.caption, 
-            style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.4),
+            postingan.judul,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
           ),
 
-          // Gambar (jika ada)
-          if (postingan.imageUrl != null && postingan.imageUrl!.isNotEmpty) ...[
+          const SizedBox(height: 8),
+
+          // Konten/isi pengumuman
+          Text(postingan.konten, style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.4)),
+
+          // File/Gambar (jika ada)
+          if (postingan.fileUrl != null && postingan.fileUrl!.isNotEmpty) ...[
             const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                postingan.imageUrl!,
-                width: double.infinity,
-                height: 180,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    width: double.infinity,
-                    height: 180,
-                    color: Colors.grey[200],
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                            : null,
-                      ),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.attach_file, color: Colors.grey, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      postingan.fileUrl!,
+                      style: const TextStyle(fontSize: 12, color: Colors.blue),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: double.infinity,
-                    height: 180,
-                    color: Colors.grey[200],
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.broken_image, color: Colors.grey, size: 40),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Gagal memuat gambar',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                  ),
+                ],
               ),
             ),
           ],
@@ -618,10 +652,7 @@ class _ClassDetailState extends State<ClassDetail> {
             children: [
               Icon(Icons.access_time, size: 12, color: Colors.grey[500]),
               const SizedBox(width: 4),
-              Text(
-                'Diposting $date',
-                style: TextStyle(color: Colors.grey[500], fontSize: 11),
-              ),
+              Text('Diposting $date', style: TextStyle(color: Colors.grey[500], fontSize: 11)),
               const Spacer(),
               if (canDelete)
                 Text(
@@ -636,13 +667,31 @@ class _ClassDetailState extends State<ClassDetail> {
   }
 
   String _formatDate(Postingan postingan) {
-    // Untuk sementara, gunakan format sederhana berdasarkan index
-    // Dalam implementasi real, gunakan field created_at dari API
+    print("📅 Formatting date for postingan: ${postingan.id}");
+
+    // Prioritaskan menggunakan createdAt dari API
+    if (postingan.createdAt != null) {
+      final date = postingan.createdAt!;
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      final formattedDate = '${date.day} ${months[date.month - 1]} ${date.year}';
+      print("✅ Using API createdAt: $formattedDate");
+      return formattedDate;
+    }
+
+    // Fallback: gunakan format berdasarkan index (untuk demo)
     final now = DateTime.now();
     final index = _postinganList.indexOf(postingan);
     final postDate = DateTime(now.year, now.month, now.day - index);
-
     final months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    return '${postDate.day} ${months[postDate.month - 1]} ${postDate.year}';
+    final formattedDate = '${postDate.day} ${months[postDate.month - 1]} ${postDate.year}';
+
+    print("⚠️ Using fallback date (index-based): $formattedDate");
+    return formattedDate;
+  }
+
+  @override
+  void dispose() {
+    print("🧹 ClassDetail disposed");
+    super.dispose();
   }
 }

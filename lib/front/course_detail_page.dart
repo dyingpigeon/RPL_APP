@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../back/auth_service.dart';
 import '../back/tugas_service.dart';
+import '../back/postingan_service.dart'; // Pastikan Anda memiliki service untuk postingan
 
 class CourseDetailPage extends StatefulWidget {
   final int tugasId;
@@ -37,12 +38,20 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
   String _errorMessage = '';
   String _userRole = 'mahasiswa';
   Map<String, dynamic>? _userData;
+  
+  // Variabel untuk fitur postingan dosen
+  bool _showCreatePost = false;
+  final TextEditingController _postTitleController = TextEditingController();
+  final TextEditingController _postContentController = TextEditingController();
+  bool _isCreatingPost = false;
+  List<Map<String, dynamic>> _postinganList = [];
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _loadTugasDetail();
+    _loadPostingan();
   }
 
   Future<void> _loadUserData() async {
@@ -103,6 +112,47 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
     }
   }
 
+Future<void> _loadPostingan() async {
+  try {
+    print("🔄 START _loadPostingan - jadwalId: ${widget.jadwalId}");
+    
+    // Load daftar postingan untuk tugas/jadwal ini
+    final List<Postingan> postingan = await PostinganService.getPostinganByJadwal(jadwalId: widget.jadwalId);
+    
+    print("📊 _loadPostingan - Received ${postingan.length} postingan");
+    
+    if (mounted) {
+      setState(() {
+        // Convert List<Postingan> to List<Map<String, dynamic>>
+        _postinganList = postingan.map((post) {
+          return {
+            'id': post.id,
+            'dosen_id': post.dosenId,
+            'jadwal_id': post.jadwalId,
+            'judul': post.judul,
+            'konten': post.konten,
+            'file_url': post.fileUrl,
+            'created_at': post.createdAt?.toIso8601String(),
+            'updated_at': post.updatedAt?.toIso8601String(),
+            'dosen_nama': post.dosen?['nama'] ?? post.dosen?['name'] ?? 'Dosen',
+          };
+        }).toList();
+        
+        print("✅ _loadPostingan - Converted to ${_postinganList.length} maps");
+      });
+    }
+  } catch (e) {
+    print("❌ ERROR in _loadPostingan: $e");
+    print("🔄 Setting empty list due to error");
+    
+    if (mounted) {
+      setState(() {
+        _postinganList = [];
+      });
+    }
+  }
+}
+
   Future<void> _submitTugas() async {
     if (_userRole != 'mahasiswa') return;
 
@@ -144,6 +194,63 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
     }
   }
 
+  Future<void> _createPostingan() async {
+    if (_userRole != 'dosen') return;
+
+    final title = _postTitleController.text.trim();
+    final content = _postContentController.text.trim();
+
+    if (title.isEmpty || content.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Judul dan konten postingan harus diisi"))
+      );
+      return;
+    }
+
+    setState(() {
+      _isCreatingPost = true;
+    });
+
+    try {
+      final result = await PostinganService.createPostingan(
+        jadwalId: widget.jadwalId,
+        judul: title,
+        konten: content,
+        dosenId: _userData?['dosen_id'] ?? widget.dosenId,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? "Postingan berhasil dibuat"))
+        );
+
+        // Reset form
+        _postTitleController.clear();
+        _postContentController.clear();
+        
+        // Tutup form
+        setState(() {
+          _showCreatePost = false;
+        });
+
+        // Reload daftar postingan
+        await _loadPostingan();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal membuat postingan: $e"))
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCreatingPost = false;
+        });
+      }
+    }
+  }
+
   void _showFileUploadOptions() {
     showModalBottomSheet(
       context: context,
@@ -180,6 +287,16 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
         ),
       ),
     );
+  }
+
+  void _toggleCreatePost() {
+    setState(() {
+      _showCreatePost = !_showCreatePost;
+      if (!_showCreatePost) {
+        _postTitleController.clear();
+        _postContentController.clear();
+      }
+    });
   }
 
   Widget _buildUserInfo() {
@@ -259,6 +376,172 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
     }
   }
 
+  Widget _buildCreatePostForm() {
+    if (!_showCreatePost) return const SizedBox();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: primaryRed),
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Buat Postingan Baru",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _postTitleController,
+            decoration: const InputDecoration(
+              labelText: "Judul Postingan",
+              border: OutlineInputBorder(),
+              hintText: "Masukkan judul postingan...",
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _postContentController,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: "Konten Postingan",
+              border: OutlineInputBorder(),
+              hintText: "Tulis konten postingan di sini...",
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: _toggleCreatePost,
+                  child: const Text("Batal"),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryRed,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: _isCreatingPost ? null : _createPostingan,
+                  child: _isCreatingPost
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(color: Colors.white),
+                        )
+                      : const Text("Buat Postingan"),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPostinganList() {
+    if (_postinganList.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Column(
+          children: [
+            Icon(Icons.announcement, size: 48, color: Colors.grey),
+            SizedBox(height: 8),
+            Text(
+              "Belum ada postingan",
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+            Text(
+              "Dosen dapat membuat postingan untuk memberikan informasi tambahan",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: _postinganList.map((postingan) => Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.white,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: primaryRed,
+                  child: Text(
+                    "D",
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        postingan['dosen_nama'] ?? 'Dosen',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        _formatDate(postingan['created_at']),
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              postingan['judul'],
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(postingan['konten']),
+          ],
+        ),
+      )).toList(),
+    );
+  }
+
+  String _formatDate(String dateString) {
+    try {
+      final date = DateTime.parse(dateString);
+      return "${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
+    } catch (e) {
+      return dateString;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final deadline = _tugasDetail?['deadline'] ?? widget.deadline;
@@ -278,6 +561,18 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
+        actions: [
+          // Tombol buat postingan hanya untuk dosen
+          if (_userRole == 'dosen')
+            IconButton(
+              icon: Icon(
+                _showCreatePost ? Icons.close : Icons.add_comment,
+                color: primaryRed,
+              ),
+              onPressed: _toggleCreatePost,
+              tooltip: _showCreatePost ? "Tutup Form" : "Buat Postingan",
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -350,6 +645,9 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
                       // Status submission (untuk mahasiswa)
                       if (_userRole == 'mahasiswa') _buildSubmissionStatus(),
 
+                      // Form buat postingan (hanya untuk dosen)
+                      if (_userRole == 'dosen') _buildCreatePostForm(),
+
                       // Container detail tugas
                       Container(
                         width: double.infinity,
@@ -414,6 +712,23 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
 
                       const SizedBox(height: 20),
 
+                      // Section Postingan
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.announcement, color: Colors.black54),
+                            SizedBox(width: 8),
+                            Text(
+                              "Postingan Dosen",
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildPostinganList(),
+
                       // File upload section (hanya untuk mahasiswa yang belum submit)
                       if (_userRole == 'mahasiswa' && !(_submissionStatus?['submitted'] ?? false))
                         Container(
@@ -473,5 +788,12 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
                   ),
                 ),
     );
+  }
+
+  @override
+  void dispose() {
+    _postTitleController.dispose();
+    _postContentController.dispose();
+    super.dispose();
   }
 }
