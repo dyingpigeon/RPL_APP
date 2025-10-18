@@ -12,7 +12,7 @@ class AuthService {
   static const String _userEmailVerifiedKey = 'userEmailVerified';
   static const String _verificationCodeKey = 'verification_code';
   static const String _verificationCodeExpiresKey = 'verification_code_expires';
-  
+
   // Mahasiswa keys
   static const String _mahasiswaIdKey = 'mahasiswa_id';
   static const String _mahasiswaUserIdKey = 'mahasiswa_user';
@@ -23,7 +23,7 @@ class AuthService {
   static const String _mahasiswaTahunMasukKey = 'mahasiswa_tahun_masuk';
   static const String _mahasiswaNomorProdiKey = 'mahasiswa_nomor_prodi';
   static const String _mahasiswaNamaKey = 'mahasiswa_nama';
-  
+
   // Dosen keys
   static const String _dosenIdKey = 'dosen_id';
   static const String _dosenUserIdKey = 'dosen_user';
@@ -44,7 +44,7 @@ class AuthService {
     required String role,
   }) async {
     print('📝 Attempting registration for: $email, role: $role');
-    
+
     final result = await ApiService.postRequest("registrasi", {
       "name": name,
       "email": email,
@@ -52,7 +52,7 @@ class AuthService {
       "password_confirmation": password,
       "role": role,
     });
-    
+
     if (result['statusCode'] == 201 || result['statusCode'] == 200) {
       print('✅ Registration successful!');
       if (result['data']['success'] == true) {
@@ -63,7 +63,7 @@ class AuthService {
     } else {
       print('❌ Registration failed: ${result['data']}');
     }
-    
+
     return result;
   }
 
@@ -72,22 +72,19 @@ class AuthService {
   // ----------------------------
   static Future<Map<String, dynamic>> login(String email, String password) async {
     print('🔐 Attempting login for: $email');
-    
-    final result = await ApiService.postRequest("login", {
-      "email": email, 
-      "password": password
-    });
+
+    final result = await ApiService.postRequest("login", {"email": email, "password": password});
 
     if (result['statusCode'] == 200) {
       try {
         final outerData = result['data'];
-        
+
         if (outerData['success'] == true) {
           final responseData = outerData['data'];
           final userData = responseData['user'];
           final token = responseData['token'];
           final tokenExpiresAt = responseData['token_expires_at'];
-          
+
           final prefs = await SharedPreferences.getInstance();
 
           // Simpan data user (umum untuk semua role)
@@ -110,7 +107,7 @@ class AuthService {
 
           // Clear data yang tidak sesuai role untuk menghindari konflik
           await _cleanupRoleData(userData['role'], prefs);
-          
+
           print('🎉 Login successful! Token saved, expires at: $tokenExpiresAt');
         } else {
           print('❌ Login failed: ${outerData['message']}');
@@ -131,11 +128,11 @@ class AuthService {
   // ----------------------------
   static Future<Map<String, dynamic>> logout() async {
     print('🚪 Attempting logout...');
-    
+
     try {
       // Panggil API logout untuk menghapus token di server
       final result = await ApiService.postRequest("logout", {});
-      
+
       if (result['statusCode'] == 200) {
         print('✅ Logout API call successful');
       } else {
@@ -149,7 +146,7 @@ class AuthService {
       await _clearAuthData(prefs);
       print("✅ User logged out, all auth data cleared");
     }
-    
+
     return {"success": true, "message": "Logout successful"};
   }
 
@@ -158,40 +155,42 @@ class AuthService {
   // ----------------------------
   static Future<Map<String, dynamic>> refreshToken() async {
     print('🔄 Attempting token refresh...');
-    
+
+    final prefs = await SharedPreferences.getInstance();
+    final currentToken = prefs.getString(_tokenKey);
+
+    // Cek jika sudah ada proses refresh yang berjalan
+    if (prefs.getBool('is_refreshing') == true) {
+      print('⏳ Token refresh already in progress...');
+      return {"success": false, "message": "Refresh already in progress"};
+    }
+
     try {
-      final response = await ApiService.postRequest("refresh-token", {});
-      
+      await prefs.setBool('is_refreshing', true);
+
+      final response = await ApiService.postRequest("refresh-token", {}).timeout(Duration(seconds: 10));
+
       if (response['statusCode'] == 200) {
         final data = response['data'];
         if (data['success'] == true) {
           final newToken = data['data']['token'];
           final newExpiresAt = data['data']['token_expires_at'];
-          
-          final prefs = await SharedPreferences.getInstance();
+
           await prefs.setString(_tokenKey, newToken);
           await prefs.setString(_tokenExpiresKey, newExpiresAt);
-          
+
           print('🔄 Token refreshed successfully! Expires at: $newExpiresAt');
-          return {
-            "success": true,
-            "token": newToken,
-            "expires_at": newExpiresAt
-          };
+          return {"success": true, "token": newToken, "expires_at": newExpiresAt};
         }
       }
-      
+
       print('❌ Token refresh failed: ${response['data']}');
-      return {
-        "success": false,
-        "message": "Token refresh failed"
-      };
+      return {"success": false, "message": "Token refresh failed: ${response['data']['message'] ?? 'Unknown error'}"};
     } catch (e) {
       print('❌ Token refresh error: $e');
-      return {
-        "success": false,
-        "message": "Token refresh error: $e"
-      };
+      return {"success": false, "message": "Token refresh error: $e"};
+    } finally {
+      await prefs.setBool('is_refreshing', false);
     }
   }
 
@@ -200,32 +199,20 @@ class AuthService {
   // ----------------------------
   static Future<Map<String, dynamic>> checkToken() async {
     print('🔍 Checking token validity...');
-    
+
     try {
       final response = await ApiService.getRequest('check-token');
-      
+
       if (response['statusCode'] == 200) {
         print('✅ Token is valid');
-        return {
-          "success": true,
-          "valid": true,
-          "user": response['data']['data'] ?? response['data']
-        };
+        return {"success": true, "valid": true, "user": response['data']['data'] ?? response['data']};
       } else {
         print('❌ Token is invalid: ${response['statusCode']}');
-        return {
-          "success": false,
-          "valid": false,
-          "message": "Token validation failed"
-        };
+        return {"success": false, "valid": false, "message": "Token validation failed"};
       }
     } catch (e) {
       print('❌ Token check error: $e');
-      return {
-        "success": false,
-        "valid": false,
-        "message": "Token check error: $e"
-      };
+      return {"success": false, "valid": false, "message": "Token check error: $e"};
     }
   }
 
@@ -234,21 +221,50 @@ class AuthService {
   // ----------------------------
   static Future<Map<String, dynamic>> forgotPassword(String email) async {
     print('🔑 Requesting password reset for: $email');
-    
+
     final result = await ApiService.postRequest("forgot-password", {"email": email});
-    
-    if (result['statusCode'] == 200) {
-      print('✅ Password reset link sent!');
-      return {
-        "success": true,
-        "message": "Password reset link sent to your email"
-      };
+
+    // ================= DEBUG PRINT LENGKAP =================
+    print('-----------------------');
+    print('🐛 DEBUG FORGOT PASSWORD RESPONSE:');
+    print('📡 Status Code: ${result['statusCode']}');
+    print('📦 Response Type: ${result['data'].runtimeType}');
+    print('🔍 Full Response Data: ${result['data']}');
+
+    // Cek struktur data
+    if (result['data'] is Map) {
+      final responseData = result['data'] as Map;
+      print('✅ Data is Map - Keys: ${responseData.keys}');
+      print('🔑 Success field: ${responseData['success']}');
+      print('📝 Message field: ${responseData['message']}');
+      print('💾 Data field: ${responseData['data']}');
     } else {
-      print('❌ Password reset request failed: ${result['data']}');
-      return {
-        "success": false,
-        "message": result['data']['message'] ?? "Password reset failed"
-      };
+      print('❌ Data is not Map: ${result['data']}');
+    }
+
+    // Debug untuk melihat apa yang diakses
+    final debugMessage = result['data']?['message'];
+    print('🔎 result["data"]?["message"] = $debugMessage');
+    print('-----------------------');
+    // ================= END DEBUG =================
+
+    if (result['statusCode'] == 200) {
+      final responseData = result['data'];
+
+      if (responseData is Map && responseData['success'] == true) {
+        print('✅ Password reset successful!');
+        return {"success": true, "message": responseData['message'] ?? "Password reset link sent to your email"};
+      } else {
+        print('❌ API returned success but operation failed');
+        final errorMessage = result['data']?['message'] ?? "Gagal mengirim kode verifikasi";
+        print('💬 Error message to show: $errorMessage');
+        return {"success": false, "message": errorMessage};
+      }
+    } else {
+      print('❌ Password reset request failed');
+      final errorMessage = result['data']?['message'] ?? "Gagal mengirim kode verifikasi";
+      print('💬 Error message to show: $errorMessage');
+      return {"success": false, "message": errorMessage};
     }
   }
 
@@ -262,26 +278,20 @@ class AuthService {
     required String passwordConfirmation,
   }) async {
     print('🔄 Resetting password for: $email');
-    
+
     final result = await ApiService.postRequest("reset-password", {
       "email": email,
       "token": token,
       "password": password,
       "password_confirmation": passwordConfirmation,
     });
-    
+
     if (result['statusCode'] == 200) {
       print('✅ Password reset successful!');
-      return {
-        "success": true,
-        "message": "Password has been reset successfully"
-      };
+      return {"success": true, "message": "Password has been reset successfully"};
     } else {
       print('❌ Password reset failed: ${result['data']}');
-      return {
-        "success": false,
-        "message": result['data']['message'] ?? "Password reset failed"
-      };
+      return {"success": false, "message": result['data']['message'] ?? "Password reset failed"};
     }
   }
 
@@ -292,68 +302,67 @@ class AuthService {
   // ----------------------------
   // SEND VERIFICATION CODE
   // ----------------------------
+  // ----------------------------
+  // SEND VERIFICATION CODE - FIXED VERSION
+  // ----------------------------
   static Future<Map<String, dynamic>> sendVerificationCode(String email) async {
     print('📧 Sending verification code to: $email');
-    
-    final result = await ApiService.postRequest("send-verification", {
-      "email": email,
-    });
-    
+
+    final result = await ApiService.postRequest("send-verification", {"email": email});
+
+    print('🔍 Raw API Response: $result');
+
     if (result['statusCode'] == 200) {
-      print('✅ Verification code sent!');
-      
-      // Simpan informasi verifikasi lokal
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_userEmailKey, email);
-      await prefs.setString(_verificationCodeExpiresKey, 
-        DateTime.now().add(Duration(minutes: 10)).toIso8601String());
-      
-      return {
-        "success": true,
-        "message": "Verification code sent to your email"
-      };
+      final responseData = result['data'];
+
+      if (responseData['success'] == true) {
+        print('✅ Verification code sent! Message: ${responseData['message']}');
+
+        // Simpan informasi verifikasi lokal
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_userEmailKey, email);
+        await prefs.setString(_verificationCodeExpiresKey, DateTime.now().add(Duration(minutes: 10)).toIso8601String());
+
+        return {"success": true, "message": responseData['message'] ?? "Verification code sent to your email"};
+      } else {
+        print('❌ API returned success but operation failed: ${responseData['message']}');
+        return {"success": false, "message": responseData['message'] ?? "Failed to send verification code"};
+      }
     } else {
-      print('❌ Failed to send verification code: ${result['data']}');
-      return {
-        "success": false,
-        "message": result['data']['message'] ?? "Failed to send verification code"
-      };
+      print('❌ Failed to send verification code with status: ${result['statusCode']}');
+
+      final responseData = result['data'];
+      String errorMessage = "Failed to send verification code";
+
+      if (responseData is Map) {
+        errorMessage = responseData['message'] ?? responseData['error'] ?? "Failed to send verification code";
+      }
+
+      return {"success": false, "message": errorMessage};
     }
   }
 
   // ----------------------------
   // VERIFY CODE
   // ----------------------------
-  static Future<Map<String, dynamic>> verifyCode({
-    required String email,
-    required String code,
-  }) async {
+  static Future<Map<String, dynamic>> verifyCode({required String email, required String code}) async {
     print('🔐 Verifying code for: $email');
-    
-    final result = await ApiService.postRequest("verify-code", {
-      "email": email,
-      "code": code,
-    });
-    
+
+    final result = await ApiService.postRequest("verify-code", {"email": email, "code": code});
+
     if (result['statusCode'] == 200) {
       print('✅ Email verified successfully!');
-      
+
       // Update status verifikasi email di local storage
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_userEmailVerifiedKey, true);
       await prefs.remove(_verificationCodeKey);
       await prefs.remove(_verificationCodeExpiresKey);
-      
-      return {
-        "success": true,
-        "message": "Email verified successfully"
-      };
+
+      return {"success": true, "message": "Email verified successfully"};
     } else {
       print('❌ Email verification failed: ${result['data']}');
-      return {
-        "success": false,
-        "message": result['data']['message'] ?? "Email verification failed"
-      };
+      return {"success": false, "message": result['data']['message'] ?? "Email verification failed"};
     }
   }
 
@@ -373,12 +382,8 @@ class AuthService {
     required String prodi,
   }) async {
     print('📝 Updating mahasiswa data - ID: $id, Nama: $nama');
-    
-    final result = await ApiService.putRequest("mahasiswa/$id", {
-      "nim": nim,
-      "kelas": kelas,
-      "prodi": prodi,
-    });
+
+    final result = await ApiService.putRequest("mahasiswa/$id", {"nim": nim, "kelas": kelas, "prodi": prodi});
 
     if (result['statusCode'] == 200) {
       final prefs = await SharedPreferences.getInstance();
@@ -423,20 +428,18 @@ class AuthService {
   // ----------------------------
   static Future<Map<String, dynamic>> updateUser({required int idu, required String nama}) async {
     print('👤 Updating user data - ID: $idu, Nama: $nama');
-    
-    final resultuser = await ApiService.putRequest("user/$idu", {
-      "name": nama,
-    });
+
+    final resultuser = await ApiService.putRequest("user/$idu", {"name": nama});
 
     if (resultuser['statusCode'] == 200) {
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_userNameKey, nama);
-        
+
         if (await isMahasiswa()) {
           await prefs.setString(_mahasiswaNamaKey, nama);
         }
-        
+
         print("✅ User name updated to: $nama");
       } catch (e) {
         print("❌ Error updating local user data: $e");
@@ -449,17 +452,10 @@ class AuthService {
   // ----------------------------
   // UPDATE DOSEN
   // ----------------------------
-  static Future<Map<String, dynamic>> updateDosen({
-    required int id,
-    required String nama,
-    required String nip,
-  }) async {
+  static Future<Map<String, dynamic>> updateDosen({required int id, required String nama, required String nip}) async {
     print('👨‍🏫 Updating dosen data - ID: $id, Nama: $nama');
-    
-    final result = await ApiService.putRequest("dosen/$id", {
-      "nama": nama,
-      "nip": nip,
-    });
+
+    final result = await ApiService.putRequest("dosen/$id", {"nama": nama, "nip": nip});
 
     if (result['statusCode'] == 200) {
       try {
@@ -467,7 +463,7 @@ class AuthService {
         await prefs.setString(_dosenNamaKey, nama);
         await prefs.setString(_dosenNipKey, nip);
         await prefs.setString(_userNameKey, nama);
-        
+
         print("✅ Dosen data updated: $nama, NIP: $nip");
       } catch (e) {
         print("❌ Error updating local dosen data: $e");
@@ -487,7 +483,7 @@ class AuthService {
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(_tokenKey);
-    
+
     if (token != null) {
       if (await isTokenExpired()) {
         print('⚠️ Token has expired, attempting refresh...');
@@ -500,7 +496,7 @@ class AuthService {
         }
       }
     }
-    
+
     return token;
   }
 
@@ -510,17 +506,18 @@ class AuthService {
   static Future<bool> isTokenExpired() async {
     final prefs = await SharedPreferences.getInstance();
     final expiresAt = prefs.getString(_tokenExpiresKey);
-    
+
     if (expiresAt == null) return true;
-    
+
     try {
       final expiryDate = DateTime.parse(expiresAt);
-      final isExpired = DateTime.now().isAfter(expiryDate.subtract(Duration(minutes: 5))); // 5 minutes buffer
-      
+      final now = DateTime.now();
+      final isExpired = now.isAfter(expiryDate.subtract(Duration(minutes: 5))); // 5 minutes buffer
+
       if (isExpired) {
-        print('🔐 Token expires at: $expiresAt');
+        print('🔐 Token expires at: $expiresAt, Current time: $now');
       }
-      
+
       return isExpired;
     } catch (e) {
       print('❌ Error parsing token expiry: $e');
@@ -539,12 +536,12 @@ class AuthService {
     try {
       final response = await checkToken();
       final isValid = response['success'] == true && response['valid'] == true;
-      
+
       if (!isValid) {
         print('❌ Token validation failed');
         await logout();
       }
-      
+
       return isValid;
     } catch (e) {
       print('❌ Token validation error: $e');
@@ -584,7 +581,7 @@ class AuthService {
   static Future<Map<String, dynamic>> getUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final String? role = prefs.getString(_userRoleKey);
-    
+
     Map<String, dynamic> userData = {
       "id": prefs.getInt(_userIdKey),
       "name": prefs.getString(_userNameKey) ?? '',
@@ -663,7 +660,7 @@ class AuthService {
   static Future<Map<String, dynamic>> getCompleteUserProfile() async {
     final userData = await getUserData();
     final String? role = await getUserRole();
-    
+
     if (role == 'mahasiswa') {
       final mahasiswa = await getMahasiswa();
       return {...userData, ...mahasiswa, 'profile_type': 'mahasiswa'};
@@ -671,24 +668,23 @@ class AuthService {
       final dosen = await getDosen();
       return {...userData, ...dosen, 'profile_type': 'dosen'};
     }
-    
+
     return {...userData, 'profile_type': 'user'};
   }
 
   static Future<bool> hasCompleteProfile() async {
     final String? role = await getUserRole();
-    
+
     if (role == 'mahasiswa') {
       final mahasiswa = await getMahasiswa();
-      return mahasiswa['nim']?.isNotEmpty == true && 
-             mahasiswa['kelas']?.isNotEmpty == true &&
-             mahasiswa['prodi']?.isNotEmpty == true;
+      return mahasiswa['nim']?.isNotEmpty == true &&
+          mahasiswa['kelas']?.isNotEmpty == true &&
+          mahasiswa['prodi']?.isNotEmpty == true;
     } else if (role == 'dosen') {
       final dosen = await getDosen();
-      return dosen['nama']?.isNotEmpty == true && 
-             dosen['nip']?.isNotEmpty == true;
+      return dosen['nama']?.isNotEmpty == true && dosen['nip']?.isNotEmpty == true;
     }
-    
+
     return true;
   }
 
@@ -697,30 +693,24 @@ class AuthService {
   // ============================
   static Future<Map<String, dynamic>> testServerConnection() async {
     print('🌐 Testing server connection...');
-    
+
     try {
       final response = await ApiService.getRequest('test-time');
-      
+
       if (response['statusCode'] == 200) {
         print('✅ Server connection successful');
         return {
           "success": true,
           "server_time": response['data']['server_time'],
-          "timezone": response['data']['timezone']
+          "timezone": response['data']['timezone'],
         };
       } else {
         print('❌ Server connection failed: ${response['statusCode']}');
-        return {
-          "success": false,
-          "message": "Server connection failed"
-        };
+        return {"success": false, "message": "Server connection failed"};
       }
     } catch (e) {
       print('❌ Server connection error: $e');
-      return {
-        "success": false,
-        "message": "Server connection error: $e"
-      };
+      return {"success": false, "message": "Server connection error: $e"};
     }
   }
 
@@ -729,10 +719,10 @@ class AuthService {
   // ============================
 
   static Future<void> _saveUserData(
-    Map<String, dynamic> userData, 
-    String token, 
-    String tokenExpiresAt, 
-    SharedPreferences prefs
+    Map<String, dynamic> userData,
+    String token,
+    String tokenExpiresAt,
+    SharedPreferences prefs,
   ) async {
     await prefs.setInt(_userIdKey, userData['id']);
     await prefs.setString(_userNameKey, userData['name']);
@@ -791,7 +781,7 @@ class AuthService {
     await prefs.remove(_userEmailVerifiedKey);
     await prefs.remove(_verificationCodeKey);
     await prefs.remove(_verificationCodeExpiresKey);
-    
+
     // Clear role-specific data
     await prefs.remove(_mahasiswaIdKey);
     await prefs.remove(_mahasiswaUserIdKey);
@@ -802,7 +792,7 @@ class AuthService {
     await prefs.remove(_mahasiswaTahunMasukKey);
     await prefs.remove(_mahasiswaNomorProdiKey);
     await prefs.remove(_mahasiswaNamaKey);
-    
+
     await prefs.remove(_dosenIdKey);
     await prefs.remove(_dosenUserIdKey);
     await prefs.remove(_dosenNamaKey);
@@ -844,4 +834,14 @@ class AuthService {
       print("❌ Fallback also failed: $fallbackError");
     }
   }
+
+  // Tambahkan di AuthService
+  static Future<void> emergencyLogout() async {
+    print('🚨 Emergency logout - clearing all auth data');
+    final prefs = await SharedPreferences.getInstance();
+    await _clearAuthData(prefs);
+    print('✅ All auth data cleared');
+  }
+
+  // Panggil method ini jika terjadi infinite loop
 }
