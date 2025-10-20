@@ -33,9 +33,11 @@ class _ClassDetailState extends State<ClassDetail> {
   void initState() {
     super.initState();
     print("🚀 ClassDetail initState - className: ${widget.className}, jadwalId: ${widget.jadwalId}");
-    _loadUserData();
-    _loadPostingan();
-    _loadNamaDosen();
+    _loadUserData().then((_) {
+      // Setelah user data loaded, baru load postingan dan nama dosen
+      _loadPostingan();
+      _loadNamaDosen();
+    });
   }
 
   // METHOD: Load data user
@@ -61,14 +63,24 @@ class _ClassDetailState extends State<ClassDetail> {
 
   Future<void> _loadPostingan() async {
     try {
-      print("🔄 START _loadPostingan - jadwalId: ${widget.jadwalId}");
+      print("🔄 START _loadPostingan - jadwalId: ${widget.jadwalId}, userRole: $_userRole");
       setState(() {
         _isLoading = true;
         _errorMessage = '';
       });
 
-      // MENYESUAIKAN: Gunakan method getPostinganByJadwal yang baru
-      final postingan = await PostinganService.getPostinganByJadwal(jadwalId: widget.jadwalId);
+      List<Postingan> postingan = [];
+
+      // ✅ LOGIKA BARU: Pilih method berdasarkan role user
+      if (_userRole == 'dosen') {
+        print("👨‍🏫 Loading postingan by dosen...");
+        // Untuk dosen: ambil semua postingan yang dibuat oleh dosen ini
+        postingan = await PostinganService.getPostinganByDosen(dosenId: widget.dosenId);
+      } else {
+        print("👨‍🎓 Loading postingan by jadwal...");
+        // Untuk mahasiswa: ambil postingan berdasarkan jadwal kelas
+        postingan = await PostinganService.getPostinganByJadwal(jadwalId: widget.jadwalId);
+      }
 
       print("📊 _loadPostingan - Received ${postingan.length} postingan");
 
@@ -300,6 +312,7 @@ class _ClassDetailState extends State<ClassDetail> {
   // METHOD: Refresh data
   Future<void> _refreshData() async {
     print("🔄 START _refreshData");
+    await _loadUserData();
     await _loadPostingan();
     await _loadNamaDosen();
     print("✅ _refreshData completed");
@@ -309,7 +322,9 @@ class _ClassDetailState extends State<ClassDetail> {
   Widget build(BuildContext context) {
     final Color primaryRed = const Color(0xFFB71C1C);
 
-    print("🎨 Building ClassDetail UI - isLoading: $_isLoading, postinganCount: ${_postinganList.length}");
+    print(
+      "🎨 Building ClassDetail UI - isLoading: $_isLoading, postinganCount: ${_postinganList.length}, userRole: $_userRole",
+    );
 
     return Scaffold(
       appBar: AppBar(

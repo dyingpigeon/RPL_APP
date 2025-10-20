@@ -29,7 +29,7 @@ class Postingan {
 
   factory Postingan.fromJson(Map<String, dynamic> json) {
     print("🔧 Parsing Postingan from JSON: $json");
-    
+
     final postingan = Postingan(
       id: json['id'] ?? 0,
       dosenId: json['dosen_id'] ?? json['dosenId'],
@@ -37,19 +37,21 @@ class Postingan {
       judul: json['judul'] ?? json['title'] ?? '',
       konten: json['konten'] ?? json['content'] ?? json['caption'] ?? '',
       fileUrl: json['file_url'] ?? json['fileUrl'] ?? json['imageUrl'],
-      createdAt: json['created_at'] != null 
-          ? DateTime.parse(json['created_at'])
-          : json['createdAt'] != null 
-            ? DateTime.parse(json['createdAt'])
-            : null,
-      updatedAt: json['updated_at'] != null 
-          ? DateTime.parse(json['updated_at'])
-          : json['updatedAt'] != null 
-            ? DateTime.parse(json['updatedAt'])
-            : null,
+      createdAt:
+          json['created_at'] != null
+              ? DateTime.parse(json['created_at'])
+              : json['createdAt'] != null
+              ? DateTime.parse(json['createdAt'])
+              : null,
+      updatedAt:
+          json['updated_at'] != null
+              ? DateTime.parse(json['updated_at'])
+              : json['updatedAt'] != null
+              ? DateTime.parse(json['updatedAt'])
+              : null,
       dosen: json['dosen'] is Map ? json['dosen'] : null,
     );
-    
+
     print("✅ Postingan parsed: ${postingan.judul}");
     return postingan;
   }
@@ -65,7 +67,7 @@ class Postingan {
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
-    
+
     print("🔧 Converting Postingan to JSON: $json");
     return json;
   }
@@ -99,11 +101,11 @@ class PostinganService {
 
       while (hasMoreData && page <= maxPages) {
         print("📖 Processing page $page");
-        
+
         final Map<String, String> queryParams = {
-          'jadwal_id': jadwalId.toString(),
+          'jadwalId': jadwalId.toString(),
           'page': page.toString(),
-          'per_page': '20'
+          'per_page': '20',
         };
 
         print("🌐 API Call - Endpoint: $endpoint, QueryParams: $queryParams");
@@ -115,9 +117,9 @@ class PostinganService {
           final data = response['data'];
           print("📊 Raw response data type: ${data.runtimeType}");
           print("📊 Raw response data: $data");
-          
+
           List<dynamic> postinganList = [];
-          
+
           // Handle berbagai kemungkinan struktur response
           if (data is List) {
             print("📋 Response is direct List");
@@ -152,15 +154,14 @@ class PostinganService {
             print("✅ No more data at page $page - stopping pagination");
           } else {
             print("🔄 Processing ${postinganList.length} postingan items");
-            final List<Postingan> pagePostingan = postinganList
-                .map((json) {
+            final List<Postingan> pagePostingan =
+                postinganList.map((json) {
                   print("🔧 Mapping JSON to Postingan: $json");
                   return Postingan.fromJson(json);
-                })
-                .toList();
+                }).toList();
             allPostingan.addAll(pagePostingan);
             print("📈 Total postingan so far: ${allPostingan.length}");
-            
+
             // Cek apakah masih ada halaman berikutnya
             final meta = data['meta'] ?? data['pagination'] ?? data['page_info'];
             if (meta != null) {
@@ -168,7 +169,7 @@ class PostinganService {
               final int? currentPage = meta['current_page'] ?? meta['page'];
               final int? lastPage = meta['last_page'] ?? meta['total_pages'];
               final bool? hasNext = meta['has_next'] ?? meta['next_page'];
-              
+
               if (currentPage != null && lastPage != null && currentPage >= lastPage) {
                 hasMoreData = false;
                 print("✅ Reached last page: $currentPage/$lastPage");
@@ -188,13 +189,13 @@ class PostinganService {
         } else {
           print("❌ API Error - Status: ${response['statusCode']}, Data: ${response['data']}");
           hasMoreData = false;
-          
+
           // Jika 404 atau error lain, return empty list
           if (response['statusCode'] == 404) {
             print("⚠️ Endpoint not found (404) - returning empty list");
             return [];
           }
-          
+
           throw Exception('Failed to load postingan: ${response['data']['message'] ?? 'Unknown error'}');
         }
       }
@@ -208,7 +209,8 @@ class PostinganService {
     }
   }
 
-  // Create new postingan - DISESUAIKAN
+  // Create new postingan - DISESUAIKAN dengan format JSON (tanpa judul)
+  // Create new postingan - DISESUAIKAN dengan format JSON dan ApiService
   static Future<Map<String, dynamic>> createPostingan({
     required int jadwalId,
     required String judul,
@@ -216,7 +218,7 @@ class PostinganService {
     int? dosenId,
     String? fileUrl,
   }) async {
-    print("🚀 START createPostingan - jadwalId: $jadwalId, judul: $judul");
+    print("🚀 START createPostingan - jadwalId: $jadwalId");
     _validateRequiredParams(jadwalId: jadwalId);
 
     try {
@@ -225,12 +227,15 @@ class PostinganService {
       int finalDosenId = dosenId ?? await _getCurrentDosenId();
       print("✅ Using dosenId: $finalDosenId");
 
+      // ✅ PERUBAHAN: Sesuaikan dengan ApiService yang require Map<String, String>
+      // Gabungkan judul dan konten menjadi caption
+      final String caption = judul.isNotEmpty ? '$judul\n\n$konten' : konten;
+
       final body = {
-        'jadwal_id': jadwalId.toString(),
-        'dosen_id': finalDosenId.toString(),
-        'judul': judul,
-        'konten': konten,
-        if (fileUrl != null && fileUrl.isNotEmpty) 'file_url': fileUrl,
+        'dosenId': finalDosenId.toString(), // ✅ Convert to String
+        'jadwalId': jadwalId.toString(), // ✅ Convert to String
+        'caption': caption, // ✅ Gunakan 'caption' untuk gabungan judul + konten
+        // 'imageUrl' tidak dimasukkan karena tidak ada file
       };
 
       print("📤 Creating postingan with body: $body");
@@ -242,25 +247,15 @@ class PostinganService {
         print("✅ Postingan created successfully");
         final responseData = response['data']['data'] ?? response['data'];
         print("🔧 Response data for parsing: $responseData");
-        
-        return {
-          'success': true,
-          'data': Postingan.fromJson(responseData),
-          'message': 'Postingan berhasil dibuat'
-        };
+
+        return {'success': true, 'data': Postingan.fromJson(responseData), 'message': 'Postingan berhasil dibuat'};
       } else {
         print("❌ Failed to create postingan: ${response['data']}");
-        return {
-          'success': false,
-          'message': response['data']['message'] ?? 'Gagal membuat postingan'
-        };
+        return {'success': false, 'message': response['data']['message'] ?? 'Gagal membuat postingan'};
       }
     } catch (e) {
       print("💥 ERROR in createPostingan: $e");
-      return {
-        'success': false,
-        'message': 'Error: $e'
-      };
+      return {'success': false, 'message': 'Error: $e'};
     }
   }
 
@@ -271,23 +266,23 @@ class PostinganService {
       print("🔍 Getting user data from AuthService...");
       final userData = await AuthService.getUserData();
       print("🔍 User data: $userData");
-      
+
       if (userData['dosen'] != null && userData['dosen']['id'] != null) {
         final dosenId = userData['dosen']['id'];
         print("✅ Found dosenId in user data: $dosenId");
         return dosenId;
       }
-      
+
       print("🔍 Getting dosen data from AuthService...");
       final dosenData = await AuthService.getDosen();
       print("🔍 Dosen data: $dosenData");
-      
+
       if (dosenData['id'] != null) {
         final dosenId = dosenData['id'];
         print("✅ Found dosenId in dosen data: $dosenId");
         return dosenId;
       }
-      
+
       print("❌ No dosenId found in user data or dosen data");
       throw Exception('Dosen ID tidak ditemukan');
     } catch (e) {
@@ -326,8 +321,8 @@ class PostinganService {
       print("✅ Using dosenId: $finalDosenId");
 
       // Fields - sesuaikan dengan field yang diharapkan API
-      request.fields['jadwal_id'] = jadwalId.toString();
-      request.fields['dosen_id'] = finalDosenId.toString();
+      request.fields['jadwalId'] = jadwalId.toString();
+      request.fields['dosenId'] = finalDosenId.toString();
       request.fields['judul'] = judul;
       request.fields['konten'] = konten;
 
@@ -335,16 +330,18 @@ class PostinganService {
 
       // File - sesuaikan dengan field file API
       print("📎 Adding file to request: $fileName (${fileBytes.length} bytes)");
-      request.files.add(http.MultipartFile.fromBytes(
-        'file', // atau 'image' tergantung API
-        fileBytes, 
-        filename: fileName
-      ));
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file', // atau 'image' tergantung API
+          fileBytes,
+          filename: fileName,
+        ),
+      );
 
       print("📤 Sending multipart request...");
       final streamedResponse = await request.send();
       print("📡 Got streamed response");
-      
+
       final response = await http.Response.fromStream(streamedResponse);
       print("📡 Response status: ${response.statusCode}");
       print("📡 Response body: ${response.body}");
@@ -353,25 +350,19 @@ class PostinganService {
         final responseData = jsonDecode(response.body);
         print("✅ Postingan with file uploaded successfully");
         print("🔧 Response data: $responseData");
-        
+
         return {
           'success': true,
           'data': Postingan.fromJson(responseData['data'] ?? responseData),
-          'message': 'Postingan berhasil diupload'
+          'message': 'Postingan berhasil diupload',
         };
       } else {
         print("❌ Failed to upload postingan: ${response.body}");
-        return {
-          'success': false,
-          'message': 'Gagal upload postingan: ${response.body}'
-        };
+        return {'success': false, 'message': 'Gagal upload postingan: ${response.body}'};
       }
     } catch (e) {
       print("💥 ERROR in createPostinganWithFile: $e");
-      return {
-        'success': false,
-        'message': 'Error uploading: $e'
-      };
+      return {'success': false, 'message': 'Error uploading: $e'};
     }
   }
 
@@ -381,29 +372,20 @@ class PostinganService {
     try {
       final endpointUrl = '$endpoint/$postinganId';
       print("🌐 API Call - DELETE $endpointUrl");
-      
+
       final response = await ApiService.deleteRequest(endpointUrl);
       print("📡 Delete response - Status: ${response['statusCode']}, Data: ${response['data']}");
 
       if (response['statusCode'] == 200 || response['statusCode'] == 204) {
         print("✅ Postingan deleted successfully");
-        return {
-          'success': true,
-          'message': 'Postingan berhasil dihapus'
-        };
+        return {'success': true, 'message': 'Postingan berhasil dihapus'};
       } else {
         print("❌ Failed to delete postingan: ${response['data']}");
-        return {
-          'success': false,
-          'message': response['data']['message'] ?? 'Gagal menghapus postingan'
-        };
+        return {'success': false, 'message': response['data']['message'] ?? 'Gagal menghapus postingan'};
       }
     } catch (e) {
       print("💥 ERROR in deletePostingan: $e");
-      return {
-        'success': false,
-        'message': 'Error: $e'
-      };
+      return {'success': false, 'message': 'Error: $e'};
     }
   }
 
@@ -416,40 +398,26 @@ class PostinganService {
   }) async {
     print("🚀 START updatePostingan - postinganId: $postinganId, judul: $judul");
     try {
-      final body = {
-        'judul': judul,
-        'konten': konten,
-        if (fileUrl != null && fileUrl.isNotEmpty) 'file_url': fileUrl,
-      };
+      final body = {'judul': judul, 'konten': konten, if (fileUrl != null && fileUrl.isNotEmpty) 'file_url': fileUrl};
 
       print("📤 Updating postingan $postinganId with body: $body");
 
       final endpointUrl = '$endpoint/$postinganId';
       final response = await ApiService.putRequest(endpointUrl, body);
-      
+
       print("📡 Update response - Status: ${response['statusCode']}, Data: ${response['data']}");
 
       if (response['statusCode'] == 200) {
         print("✅ Postingan updated successfully");
         final responseData = response['data']['data'] ?? response['data'];
-        return {
-          'success': true,
-          'data': Postingan.fromJson(responseData),
-          'message': 'Postingan berhasil diupdate'
-        };
+        return {'success': true, 'data': Postingan.fromJson(responseData), 'message': 'Postingan berhasil diupdate'};
       } else {
         print("❌ Failed to update postingan: ${response['data']}");
-        return {
-          'success': false,
-          'message': response['data']['message'] ?? 'Gagal mengupdate postingan'
-        };
+        return {'success': false, 'message': response['data']['message'] ?? 'Gagal mengupdate postingan'};
       }
     } catch (e) {
       print("💥 ERROR in updatePostingan: $e");
-      return {
-        'success': false,
-        'message': 'Error: $e'
-      };
+      return {'success': false, 'message': 'Error: $e'};
     }
   }
 
@@ -459,30 +427,21 @@ class PostinganService {
     try {
       final endpointUrl = '$endpoint/$postinganId';
       print("🌐 API Call - GET $endpointUrl");
-      
+
       final response = await ApiService.getRequest(endpointUrl);
       print("📡 Get by ID response - Status: ${response['statusCode']}, Data: ${response['data']}");
 
       if (response['statusCode'] == 200) {
         print("✅ Postingan retrieved successfully");
         final responseData = response['data']['data'] ?? response['data'];
-        return {
-          'success': true,
-          'data': Postingan.fromJson(responseData)
-        };
+        return {'success': true, 'data': Postingan.fromJson(responseData)};
       } else {
         print("❌ Failed to get postingan by ID: ${response['data']}");
-        return {
-          'success': false,
-          'message': response['data']['message'] ?? 'Gagal memuat postingan'
-        };
+        return {'success': false, 'message': response['data']['message'] ?? 'Gagal memuat postingan'};
       }
     } catch (e) {
       print("💥 ERROR in getPostinganById: $e");
-      return {
-        'success': false,
-        'message': 'Error: $e'
-      };
+      return {'success': false, 'message': 'Error: $e'};
     }
   }
 
@@ -497,9 +456,9 @@ class PostinganService {
       if (response['statusCode'] == 200) {
         final data = response['data'];
         print("📊 Raw response data: $data");
-        
+
         List<dynamic> postinganList = [];
-        
+
         if (data is List) {
           print("📋 Response is direct List");
           postinganList = data;
@@ -509,19 +468,167 @@ class PostinganService {
         }
 
         print("📊 Total postingan found: ${postinganList.length}");
-        final result = postinganList.map((json) {
-          print("🔧 Mapping JSON to Postingan: $json");
-          return Postingan.fromJson(json);
-        }).toList();
-        
+        final result =
+            postinganList.map((json) {
+              print("🔧 Mapping JSON to Postingan: $json");
+              return Postingan.fromJson(json);
+            }).toList();
+
         print("✅ getAllPostingan completed - Found ${result.length} postingan");
         return result;
       }
-      
+
       print("❌ API returned non-200 status");
       return [];
     } catch (e) {
       print("💥 ERROR in getAllPostingan: $e");
+      return [];
+    }
+  }
+
+  // Get semua postingan berdasarkan dosenId - DISESUAIKAN dengan struktur JSON
+  static Future<List<Postingan>> getPostinganByDosen({required int dosenId}) async {
+    print("🚀 START getPostinganByDosen - dosenId: $dosenId");
+
+    try {
+      final List<Postingan> allPostingan = [];
+      int page = 1;
+      bool hasMoreData = true;
+      int maxPages = 10;
+
+      print("🔄 Starting pagination loop for dosenId: $dosenId");
+
+      while (hasMoreData && page <= maxPages) {
+        print("📖 Processing page $page");
+
+        final Map<String, String> queryParams = {
+          'dosen_id': dosenId.toString(), // Parameter query untuk filter by dosen
+          'page': page.toString(),
+          'per_page': '20',
+        };
+
+        print("🌐 API Call - Endpoint: $endpoint, QueryParams: $queryParams");
+        final response = await ApiService.getRequest(endpoint, queryParams: queryParams);
+
+        print("📡 API Response - Status: ${response['statusCode']}, Page: $page");
+
+        if (response['statusCode'] == 200) {
+          final data = response['data'];
+          print("📊 Raw response data type: ${data.runtimeType}");
+          print("📊 Raw response data: $data");
+
+          List<dynamic> postinganList = [];
+
+          // Handle berbagai kemungkinan struktur response
+          if (data is List) {
+            print("📋 Response is direct List");
+            postinganList = data;
+          } else if (data['data'] is List) {
+            print("📋 Response has 'data' key with List");
+            postinganList = data['data'];
+          } else if (data['items'] is List) {
+            print("📋 Response has 'items' key with List");
+            postinganList = data['items'];
+          } else if (data['postingan'] is List) {
+            print("📋 Response has 'postingan' key with List");
+            postinganList = data['postingan'];
+          } else if (data['posts'] is List) {
+            print("📋 Response has 'posts' key with List");
+            postinganList = data['posts'];
+          } else {
+            print("⚠️ Unknown response structure, trying to extract any list");
+            // Coba cari key yang mengandung list
+            data.forEach((key, value) {
+              if (value is List) {
+                print("📋 Found list in key: $key");
+                postinganList = value;
+              }
+            });
+          }
+
+          print("📊 Page $page: Found ${postinganList.length} postingan items");
+
+          if (postinganList.isEmpty) {
+            hasMoreData = false;
+            print("✅ No more data at page $page - stopping pagination");
+          } else {
+            print("🔄 Processing ${postinganList.length} postingan items");
+
+            // Filter by dosenId di client side (jika backend tidak support filter)
+            final List<dynamic> filteredList =
+                postinganList.where((item) {
+                  final itemDosenId = item['dosenId'] ?? item['dosen_id'];
+                  return itemDosenId == dosenId;
+                }).toList();
+
+            print("🔍 After filtering: ${filteredList.length} items for dosenId: $dosenId");
+
+            final List<Postingan> pagePostingan =
+                filteredList.map((json) {
+                  print("🔧 Mapping JSON to Postingan: $json");
+                  return Postingan.fromJson(json);
+                }).toList();
+            allPostingan.addAll(pagePostingan);
+            print("📈 Total postingan so far: ${allPostingan.length}");
+
+            // Cek apakah masih ada halaman berikutnya
+            final meta = data['meta'] ?? data['pagination'] ?? data['page_info'];
+            if (meta != null) {
+              print("📑 Pagination metadata found: $meta");
+              final int? currentPage = meta['current_page'] ?? meta['page'];
+              final int? lastPage = meta['last_page'] ?? meta['total_pages'];
+              final bool? hasNext = meta['has_next'] ?? meta['next_page'];
+
+              if (currentPage != null && lastPage != null && currentPage >= lastPage) {
+                hasMoreData = false;
+                print("✅ Reached last page: $currentPage/$lastPage");
+              } else if (hasNext != null && !hasNext) {
+                hasMoreData = false;
+                print("✅ No next page available");
+              } else {
+                page++;
+                print("➡️ Moving to next page: $page");
+              }
+            } else {
+              // Jika tidak ada metadata, asumsikan single page
+              hasMoreData = false;
+              print("✅ No pagination metadata - assuming single page");
+            }
+          }
+        } else {
+          print("❌ API Error - Status: ${response['statusCode']}, Data: ${response['data']}");
+          hasMoreData = false;
+
+          // Jika 404 atau error lain, return empty list
+          if (response['statusCode'] == 404) {
+            print("⚠️ Endpoint not found (404) - returning empty list");
+            return [];
+          }
+
+          throw Exception('Failed to load postingan: ${response['data']['message'] ?? 'Unknown error'}');
+        }
+      }
+
+      print("🎉 FINISHED getPostinganByDosen - Total: ${allPostingan.length} postingan for dosenId: $dosenId");
+      return allPostingan;
+    } catch (e) {
+      print("💥 ERROR in getPostinganByDosen: $e");
+      print("🔄 Returning empty list due to error");
+      return [];
+    }
+  }
+
+  // Get postingan oleh dosen yang sedang login
+  static Future<List<Postingan>> getMyPostingan() async {
+    print("🚀 START getMyPostingan");
+    try {
+      print("🔍 Getting current dosenId...");
+      final dosenId = await _getCurrentDosenId();
+      print("✅ Current dosenId: $dosenId");
+
+      return await getPostinganByDosen(dosenId: dosenId);
+    } catch (e) {
+      print("💥 ERROR in getMyPostingan: $e");
       return [];
     }
   }
