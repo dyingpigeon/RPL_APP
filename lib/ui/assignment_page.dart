@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../back/auth_service.dart';
-import '../back/tugas_service.dart';
+import '../services/auth_service.dart';
+import '../services/tugas_service.dart';
 
 class CourseDetailPage extends StatefulWidget {
   final int tugasId;

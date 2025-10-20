@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'package:elearning_rpl_5d/front/assignment_page.dart';
+import 'package:elearning_rpl_5d/ui/assignment_page.dart';
 import 'package:flutter/material.dart';
 import 'class_detail_page.dart';
-import '/back/jadwal_service.dart';
-import '../back/auth_service.dart';
-import '/back/tugas_service.dart';
+import '../services/jadwal_service.dart';
+import '../services/auth_service.dart';
+import '../services/tugas_service.dart';
 
 const Color primaryRed = Color(0xFFC2000E);
 

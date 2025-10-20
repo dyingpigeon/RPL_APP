@@ -1,4 +1,4 @@
-import 'package:elearning_rpl_5d/front/class_page.dart';
+import 'package:elearning_rpl_5d/ui/class_page.dart';
 import 'package:flutter/material.dart';
 import 'front/login_page.dart';
 import 'front/signup_page.dart';

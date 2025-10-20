@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../back/auth_service.dart'; // Import AuthService
+import '../services/auth_service.dart'; // Import AuthService
 import 'login_page.dart';
 
 class VerificationCodePage extends StatefulWidget {

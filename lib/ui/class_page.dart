@@ -1,7 +1,7 @@
-import 'package:elearning_rpl_5d/front/class_detail_page.dart';
-import '../back/auth_service.dart';
+import 'package:elearning_rpl_5d/ui/class_detail_page.dart';
+import '../services/auth_service.dart';
 import 'package:flutter/material.dart';
-import '../back/jadwal_service.dart';
+import '../services/jadwal_service.dart';
 
 class ClassPage extends StatefulWidget {
   const ClassPage({super.key});

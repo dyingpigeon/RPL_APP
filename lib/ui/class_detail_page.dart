@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:elearning_rpl_5d/back/postingan_service.dart';
-import 'package:elearning_rpl_5d/back/dosen_service.dart';
-import 'package:elearning_rpl_5d/back/auth_service.dart';
+import 'package:elearning_rpl_5d/services/postingan_service.dart';
+import 'package:elearning_rpl_5d/services/dosen_service.dart';
+import 'package:elearning_rpl_5d/services/auth_service.dart';
 
 class ClassDetail extends StatefulWidget {
   final String className;
