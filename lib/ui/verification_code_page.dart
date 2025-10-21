@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart'; // Import AuthService
-import 'login_page.dart';
+import 'package:provider/provider.dart';
+import '../controllers/verification_code_controller.dart';
 
 class VerificationCodePage extends StatefulWidget {
   final String email;
@@ -11,155 +11,133 @@ class VerificationCodePage extends StatefulWidget {
 }
 
 class _VerificationCodePageState extends State<VerificationCodePage> {
-  final Color primaryRed = const Color(0xFFC2000E);
-  final List<TextEditingController> codeControllers = List.generate(6, (_) => TextEditingController());
-  final TextEditingController newPasswordController = TextEditingController();
-  final TextEditingController confirmPasswordController = TextEditingController();
-  bool isLoading = false;
-
-  Future<void> _resetPassword(String token) async {
-    setState(() => isLoading = true);
-
-    // Validasi password
-    if (newPasswordController.text != confirmPasswordController.text) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Password dan konfirmasi password tidak sama")));
-      setState(() => isLoading = false);
-      return;
-    }
-
-    // Gunakan AuthService untuk reset password
-    final result = await AuthService.resetPassword(
-      email: widget.email,
-      token: token,
-      password: newPasswordController.text.trim(),
-      passwordConfirmation: confirmPasswordController.text.trim(),
-    );
-
-    setState(() => isLoading = false);
-
-    if (result['statusCode'] == 200) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Password berhasil direset")));
-
-      // Kembali ke login
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
-    } else {
-      final errorMessage = result['data']['message'] ?? "Reset password gagal";
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMessage)));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Verification Code"), backgroundColor: primaryRed),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                "Kode OTP telah dikirim ke email: ${widget.email}",
-                style: const TextStyle(fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
+    return ChangeNotifierProvider(
+      create: (context) => VerificationCodeController(email: widget.email),
+      child: Scaffold(
+        appBar: _buildAppBar(),
+        body: _buildBody(),
+      ),
+    );
+  }
 
-              // Input token/OTP
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(6, (index) {
-                  return SizedBox(
-                    width: 40,
-                    child: TextField(
-                      controller: codeControllers[index],
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      maxLength: 1,
-                      decoration: const InputDecoration(counterText: "", border: OutlineInputBorder()),
-                      onChanged: (value) {
-                        if (value.isNotEmpty && index < 5) {
-                          FocusScope.of(context).nextFocus();
-                        } else if (value.isEmpty && index > 0) {
-                          FocusScope.of(context).previousFocus();
-                        }
-                      },
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 20),
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: const Text("Verification Code"),
+      backgroundColor: const Color(0xFFC2000E),
+    );
+  }
 
-              // Input password baru
-              TextField(
-                controller: newPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: "Password Baru", border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 15),
-
-              // Input konfirmasi password
-              TextField(
-                controller: confirmPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: "Konfirmasi Password Baru", border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 30),
-
-              // Tombol Submit
-              SizedBox(
-                width: 180,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryRed,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  ),
-                  onPressed: isLoading ? null : _handleSubmit,
-                  child:
-                      isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text("Submit", style: TextStyle(color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
+  Widget _buildBody() {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _buildEmailInfo(),
+            const SizedBox(height: 20),
+            _buildCodeInputSection(),
+            const SizedBox(height: 20),
+            _buildPasswordSection(),
+            const SizedBox(height: 30),
+            _buildSubmitButton(),
+          ],
         ),
       ),
     );
   }
 
-  void _handleSubmit() {
-    String token = codeControllers.map((e) => e.text).join();
-
-    if (token.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Harap isi semua kode OTP")));
-      return;
-    }
-
-    if (newPasswordController.text.isEmpty || confirmPasswordController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Harap isi password baru dan konfirmasinya")));
-      return;
-    }
-
-    _resetPassword(token);
+  Widget _buildEmailInfo() {
+    return Consumer<VerificationCodeController>(
+      builder: (context, controller, child) {
+        return Text(
+          "Kode OTP telah dikirim ke email: ${controller.model.email}",
+          style: const TextStyle(fontSize: 16),
+          textAlign: TextAlign.center,
+        );
+      },
+    );
   }
 
-  @override
-  void dispose() {
-    for (var controller in codeControllers) {
-      controller.dispose();
-    }
-    newPasswordController.dispose();
-    confirmPasswordController.dispose();
-    super.dispose();
+  Widget _buildCodeInputSection() {
+    return Consumer<VerificationCodeController>(
+      builder: (context, controller, child) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(6, (index) {
+            return SizedBox(
+              width: 40,
+              child: TextField(
+                controller: controller.codeControllers[index],
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                maxLength: 1,
+                decoration: const InputDecoration(
+                  counterText: "",
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) => controller.updateCode(index, value, context),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+
+  Widget _buildPasswordSection() {
+    return Consumer<VerificationCodeController>(
+      builder: (context, controller, child) {
+        return Column(
+          children: [
+            TextField(
+              controller: controller.newPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: "Password Baru",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: controller.confirmPasswordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: "Konfirmasi Password Baru",
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSubmitButton() {
+    return Consumer<VerificationCodeController>(
+      builder: (context, controller, child) {
+        return SizedBox(
+          width: 180,
+          height: 48,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: controller.primaryRed,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            ),
+            onPressed: controller.model.canSubmit
+                ? () => controller.resetPassword(context)
+                : null,
+            child: controller.model.isLoading
+                ? const CircularProgressIndicator(color: Colors.white)
+                : const Text(
+                    "Submit",
+                    style: TextStyle(color: Colors.white),
+                  ),
+          ),
+        );
+      },
+    );
   }
 }
