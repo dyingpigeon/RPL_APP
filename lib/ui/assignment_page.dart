@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
-import '../services/tugas_service.dart';
+import 'package:provider/provider.dart';
+import '../controllers/assignment_controller.dart';
 
-class CourseDetailPage extends StatefulWidget {
+class AssignmentPage extends StatefulWidget {
   final int tugasId;
   final String judul;
   final String deskripsi;
@@ -12,7 +12,7 @@ class CourseDetailPage extends StatefulWidget {
   final int dosenId;
   final String dosenNama;
 
-  const CourseDetailPage({
+  const AssignmentPage({
     super.key,
     required this.tugasId,
     required this.judul,
@@ -25,190 +25,165 @@ class CourseDetailPage extends StatefulWidget {
   });
 
   @override
-  State<CourseDetailPage> createState() => _CourseDetailPageState();
+  State<AssignmentPage> createState() => _AssignmentPageState();
 }
 
-class _CourseDetailPageState extends State<CourseDetailPage> {
-  final Color primaryRed = const Color(0xFFB71C1C);
-  Map<String, dynamic>? _tugasDetail;
-  Map<String, dynamic>? _submissionStatus;
-  bool _isLoading = true;
-  bool _isSubmitting = false;
-  String _errorMessage = '';
-  String _userRole = 'mahasiswa';
-  Map<String, dynamic>? _userData;
-
+class _AssignmentPageState extends State<AssignmentPage> {
   @override
-  void initState() {
-    super.initState();
-    _loadUserData();
-    _loadTugasDetail();
-  }
-
-  Future<void> _loadUserData() async {
-    try {
-      final role = await AuthService.getUserRole();
-      final userData = await AuthService.getCompleteUserProfile();
-
-      if (mounted) {
-        setState(() {
-          _userRole = role ?? 'mahasiswa';
-          _userData = userData;
-        });
-      }
-    } catch (e) {
-      print("Error loading user data: $e");
-    }
-  }
-
-  Future<void> _loadTugasDetail() async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = '';
-      });
-
-      // Load detail tugas
-      final tugasDetail = await TugasService.getTugasDetail(widget.tugasId);
-
-      // Load submission status untuk mahasiswa
-      if (_userRole == 'mahasiswa') {
-        final submissionStatus = await TugasService.getSubmissionStatus(widget.tugasId);
-
-        if (mounted) {
-          setState(() {
-            _tugasDetail = tugasDetail;
-            _submissionStatus = submissionStatus;
-            _isLoading = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _tugasDetail = tugasDetail;
-            _isLoading = false;
-          });
-        }
-      }
-
-      print("✅ Tugas detail loaded: ${_tugasDetail?['judul']}");
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = e.toString();
-        });
-      }
-      print("❌ Error loading tugas detail: $e");
-    }
-  }
-
-  Future<void> _submitTugas() async {
-    if (_userRole != 'mahasiswa') return;
-
-    // Simulasi upload file - dalam implementasi real, gunakan file picker
-    final fileUrl = "https://example.com/uploaded_file.pdf";
-    final fileName = "tugas_${widget.tugasId}_${_userData?['nim'] ?? 'unknown'}.pdf";
-
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    try {
-      final result = await TugasService.submitTugas(tugasId: widget.tugasId, fileUrl: fileUrl, fileName: fileName);
-
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(result['message'] ?? "Tugas berhasil disubmit")));
-
-        // Reload submission status
-        await _loadTugasDetail();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Gagal submit tugas: $e")));
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
-    }
-  }
-
-  void _showFileUploadOptions() {
-    showModalBottomSheet(
-      context: context,
-      builder:
-          (context) => Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.photo_library),
-                  title: const Text('Pilih dari Gallery'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    // Implement gallery picker
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.attach_file),
-                  title: const Text('Pilih File'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    // Implement file picker
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.camera_alt),
-                  title: const Text('Ambil Foto'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    // Implement camera
-                  },
-                ),
-              ],
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (context) => AssignmentController(
+        tugasId: widget.tugasId,
+        judul: widget.judul,
+        deskripsi: widget.deskripsi,
+        deadline: widget.deadline,
+        fileUrl: widget.fileUrl,
+        jadwalId: widget.jadwalId,
+        dosenId: widget.dosenId,
+        dosenNama: widget.dosenNama,
+      ),
+      child: Consumer<AssignmentController>(
+        builder: (context, controller, child) {
+          return Scaffold(
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.black),
+                onPressed: () => controller.navigateBack(context),
+              ),
+              title: Text(
+                controller.model.judul.isNotEmpty ? controller.model.judul : widget.judul,
+                style: const TextStyle(color: Colors.black),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
+            body: _buildBody(controller),
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildUserInfo() {
-    if (_userRole == 'mahasiswa') {
+  Widget _buildBody(AssignmentController controller) {
+    if (controller.model.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (controller.model.hasError) {
+      return _buildErrorState(controller);
+    }
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildUserHeader(controller),
+          if (controller.model.isMahasiswa) _buildSubmissionStatus(controller),
+          _buildAssignmentDetail(controller),
+          _buildActionSection(controller),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(AssignmentController controller) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(
+              "Terjadi Kesalahan",
+              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              controller.model.errorMessage,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey[600], fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => controller.retryLoading(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: controller.primaryRed,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Coba Lagi'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserHeader(AssignmentController controller) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 26,
+            backgroundColor: controller.primaryRed,
+            child: Text(
+              controller.model.isMahasiswa ? 'M' : 'D',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  controller.model.userName,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                _buildUserInfo(controller),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserInfo(AssignmentController controller) {
+    if (controller.model.isMahasiswa) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("NIM: ${_userData?['nim'] ?? '-'}", style: const TextStyle(fontSize: 14)),
-          Text("Kelas: ${_userData?['kelas'] ?? '-'}", style: const TextStyle(fontSize: 14)),
-          Text("Prodi: ${_userData?['prodi'] ?? '-'}", style: const TextStyle(fontSize: 14)),
+          Text("NIM: ${controller.model.userNim}", style: const TextStyle(fontSize: 14)),
+          Text("Kelas: ${controller.model.userKelas}", style: const TextStyle(fontSize: 14)),
+          Text("Prodi: ${controller.model.userProdi}", style: const TextStyle(fontSize: 14)),
         ],
       );
     } else {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("NIP: ${_userData?['nip'] ?? '-'}", style: const TextStyle(fontSize: 14)),
+          Text("NIP: ${controller.model.userNip}", style: const TextStyle(fontSize: 14)),
           Text("Sebagai: Dosen Pengajar", style: const TextStyle(fontSize: 14)),
         ],
       );
     }
   }
 
-  Widget _buildSubmissionStatus() {
-    if (_userRole != 'mahasiswa') return const SizedBox();
-
-    final isSubmitted = _submissionStatus?['submitted'] ?? false;
-    final submissionData = _submissionStatus?['submissionData'];
+  Widget _buildSubmissionStatus(AssignmentController controller) {
+    final isSubmitted = controller.model.isSubmitted;
+    final submissionData = controller.model.submissionStatus?['submissionData'];
 
     if (isSubmitted && submissionData != null) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
         decoration: BoxDecoration(
           color: Colors.green[50],
           border: Border.all(color: Colors.green),
@@ -229,7 +204,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
             if (submissionData['nilai'] != null) Text("Nilai: ${submissionData['nilai']}"),
             if (submissionData['komentar'] != null) Text("Komentar: ${submissionData['komentar']}"),
             if (submissionData['submittedAt'] != null)
-              Text("Waktu Submit: ${_formatDate(submissionData['submittedAt'])}"),
+              Text("Waktu Submit: ${controller.formatDate(submissionData['submittedAt'])}"),
           ],
         ),
       );
@@ -237,7 +212,7 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
         decoration: BoxDecoration(
           color: Colors.orange[50],
           border: Border.all(color: Colors.orange),
@@ -254,260 +229,174 @@ class _CourseDetailPageState extends State<CourseDetailPage> {
     }
   }
 
-  String _formatDate(String? dateString) {
-    if (dateString == null || dateString.isEmpty) {
-      return "Tanggal tidak tersedia";
-    }
+  Widget _buildAssignmentDetail(AssignmentController controller) {
+    final formattedDeadline = controller.getFormattedDeadline();
 
-    try {
-      final date = DateTime.parse(dateString);
-      return "${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}";
-    } catch (e) {
-      return dateString;
-    }
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: controller.primaryRed, width: 1.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            controller.model.judul,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "Deadline: $formattedDeadline",
+            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "100 points",
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            controller.model.deskripsi,
+            style: const TextStyle(fontSize: 14, color: Colors.black87),
+          ),
+          const SizedBox(height: 12),
+          _buildAdditionalInfo(controller),
+          _buildFileAttachment(controller),
+        ],
+      ),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final deadline = _tugasDetail?['deadline'] ?? widget.deadline;
-    final formattedDeadline = deadline.toString().split(" ")[0];
-
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          _tugasDetail?['judul'] ?? widget.judul,
-          style: const TextStyle(color: Colors.black),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+  Widget _buildAdditionalInfo(AssignmentController controller) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
       ),
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _errorMessage.isNotEmpty
-              ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                      const SizedBox(height: 16),
-                      Text("Terjadi Kesalahan", style: TextStyle(color: Colors.grey[600], fontSize: 16)),
-                      const SizedBox(height: 8),
-                      Text(
-                        _errorMessage,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: _loadTugasDetail,
-                        style: ElevatedButton.styleFrom(backgroundColor: primaryRed, foregroundColor: Colors.white),
-                        child: const Text('Coba Lagi'),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-              : SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Informasi Tugas:", style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text("Dosen: ${controller.model.dosenNama}"),
+          Text("Mata Kuliah: ${controller.model.mataKuliah}"),
+          Text("Kelas: ${controller.model.kelas}"),
+          Text("Prodi: ${controller.model.prodi}"),
+          Text("Semester: ${controller.model.semester}"),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFileAttachment(AssignmentController controller) {
+    if (controller.model.fileUrl == null || controller.model.fileUrl!.isEmpty) {
+      return const SizedBox();
+    }
+
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        const Text("File Terlampir:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 4),
+        Text(controller.model.fileUrl!, style: const TextStyle(fontSize: 14, color: Colors.blue)),
+      ],
+    );
+  }
+
+  Widget _buildActionSection(AssignmentController controller) {
+    return Column(
+      children: [
+        if (controller.model.canSubmit) ...[
+          _buildFileUploadSection(controller),
+          _buildSubmitButton(controller),
+        ],
+        if (controller.model.isDosen) _buildDosenInfo(controller),
+      ],
+    );
+  }
+
+  Widget _buildFileUploadSection(AssignmentController controller) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      child: GestureDetector(
+        onTap: controller.model.isSubmitting ? null : () => controller.showFileUploadOptions(context),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          decoration: BoxDecoration(
+            border: Border.all(color: controller.model.isSubmitting ? Colors.grey : Colors.black26),
+            borderRadius: BorderRadius.circular(8),
+            color: controller.model.isSubmitting ? Colors.grey[100] : Colors.white,
+          ),
+          child: controller.model.isSubmitting
+              ? const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Header dengan informasi user
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 26,
-                            backgroundColor: primaryRed,
-                            child: Text(
-                              _userRole == 'mahasiswa' ? 'M' : 'D',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _userData?['name'] ?? 'User',
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                ),
-                                _buildUserInfo(),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Status submission (untuk mahasiswa)
-                    if (_userRole == 'mahasiswa') _buildSubmissionStatus(),
-
-                    // Container detail tugas
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: primaryRed, width: 1.5),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _tugasDetail?['judul'] ?? widget.judul,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            "Deadline: $formattedDeadline",
-                            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            "100 points",
-                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _tugasDetail?['deskripsi'] ?? widget.deskripsi,
-                            style: const TextStyle(fontSize: 14, color: Colors.black87),
-                          ),
-                          const SizedBox(height: 12),
-
-                          // Informasi tambahan
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(8)),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text("Informasi Tugas:", style: TextStyle(fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 4),
-                                Text("Dosen: ${_tugasDetail?['dosenNama'] ?? widget.dosenNama}"),
-                                Text("Mata Kuliah: ${_tugasDetail?['mataKuliah'] ?? '-'}"),
-                                Text("Kelas: ${_tugasDetail?['kelas'] ?? '-'}"),
-                                Text("Prodi: ${_tugasDetail?['prodi'] ?? '-'}"),
-                                Text("Semester: ${_tugasDetail?['semester'] ?? '-'}"),
-                              ],
-                            ),
-                          ),
-
-                          // File terlampir
-                          if (_tugasDetail?['fileUrl'] != null && (_tugasDetail?['fileUrl'] as String).isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            const Text("File Terlampir:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                            const SizedBox(height: 4),
-                            Text(_tugasDetail!['fileUrl'], style: const TextStyle(fontSize: 14, color: Colors.blue)),
-                          ],
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // File upload section (hanya untuk mahasiswa yang belum submit)
-                    if (_userRole == 'mahasiswa' && !(_submissionStatus?['submitted'] ?? false))
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                        child: GestureDetector(
-                          onTap: _isSubmitting ? null : _showFileUploadOptions,
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: _isSubmitting ? Colors.grey : Colors.black26),
-                              borderRadius: BorderRadius.circular(8),
-                              color: _isSubmitting ? Colors.grey[100] : Colors.white,
-                            ),
-                            child:
-                                _isSubmitting
-                                    ? const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        CircularProgressIndicator(),
-                                        SizedBox(width: 8),
-                                        Text("Mengupload..."),
-                                      ],
-                                    )
-                                    : const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.upload_file, color: Colors.black54),
-                                        SizedBox(width: 8),
-                                        Text("Pilih File untuk Diupload"),
-                                      ],
-                                    ),
-                          ),
-                        ),
-                      ),
-
-                    // Tombol submit (hanya untuk mahasiswa yang belum submit)
-                    if (_userRole == 'mahasiswa' && !(_submissionStatus?['submitted'] ?? false)) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryRed,
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                          ),
-                          onPressed: _isSubmitting ? null : _submitTugas,
-                          child:
-                              _isSubmitting
-                                  ? const CircularProgressIndicator(color: Colors.white)
-                                  : const Text("Submit Tugas", style: TextStyle(color: Colors.white, fontSize: 16)),
-                        ),
-                      ),
-                    ],
-
-                    // Info untuk dosen
-                    if (_userRole == 'dosen') ...[
-                      const SizedBox(height: 20),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue),
-                        ),
-                        child: const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.info, color: Colors.blue),
-                                SizedBox(width: 8),
-                                Text("Info Dosen", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-                              ],
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              "Anda dapat melihat detail tugas dan submission mahasiswa di halaman ini.",
-                              style: TextStyle(fontSize: 14),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 20),
+                    CircularProgressIndicator(),
+                    SizedBox(width: 8),
+                    Text("Mengupload..."),
+                  ],
+                )
+              : const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.upload_file, color: Colors.black54),
+                    SizedBox(width: 8),
+                    Text("Pilih File untuk Diupload"),
                   ],
                 ),
-              ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubmitButton(AssignmentController controller) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      width: double.infinity,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: controller.primaryRed,
+          padding: const EdgeInsets.symmetric(vertical: 15),
+        ),
+        onPressed: controller.model.isSubmitting ? null : () => controller.submitAssignment(context),
+        child: controller.model.isSubmitting
+            ? const CircularProgressIndicator(color: Colors.white)
+            : const Text("Submit Tugas", style: TextStyle(color: Colors.white, fontSize: 16)),
+      ),
+    );
+  }
+
+  Widget _buildDosenInfo(AssignmentController controller) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info, color: Colors.blue),
+              SizedBox(width: 8),
+              Text("Info Dosen", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+            ],
+          ),
+          SizedBox(height: 8),
+          Text(
+            "Anda dapat melihat detail tugas dan submission mahasiswa di halaman ini.",
+            style: TextStyle(fontSize: 14),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'login_page.dart';
-import '../services/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../controllers/signup_controller.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -10,150 +10,237 @@ class SignupPage extends StatefulWidget {
 }
 
 class _SignupPageState extends State<SignupPage> {
-  final Color primaryRed = const Color(0xFFC2000E);
-
-  final TextEditingController nameCtrl = TextEditingController();
-  final TextEditingController emailCtrl = TextEditingController();
-  final TextEditingController passCtrl = TextEditingController();
-  final TextEditingController confirmPassCtrl = TextEditingController();
-
-  String? selectedRole; // Mahasiswa atau Dosen
-  bool isLoading = false;
-
-  void _register() async {
-    final name = nameCtrl.text.trim();
-    final email = emailCtrl.text.trim();
-    final password = passCtrl.text.trim();
-    final confirmPassword = confirmPassCtrl.text.trim();
-    final role = selectedRole?.toLowerCase(); // API pakai lowercase
-
-    if (name.isEmpty || email.isEmpty || password.isEmpty || role == null) {
-      _showSnackBar("Semua field wajib diisi");
-      return;
-    }
-
-    if (password != confirmPassword) {
-      _showSnackBar("Password dan konfirmasi tidak sama");
-      return;
-    }
-
-    setState(() => isLoading = true);
-
-    final result = await AuthService.register(name: name, email: email, password: password, role: role);
-
-    setState(() => isLoading = false);
-
-    final statusCode = result["statusCode"];
-    final data = result["data"];
-
-    if (statusCode == 200 && !data.containsKey("errors")) {
-      _showSnackBar("Registrasi berhasil, silakan login");
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginPage()));
-    } else {
-      _showSnackBar(data["message"] ?? "Registrasi gagal");
-    }
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: primaryRed));
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: ListView(
-            children: [
-              const SizedBox(height: 60),
-              const Text(
-                'Sign Up!',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Silahkan Buat Akun Terlebih Dahulu',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 40),
-
-              // Name
-              const Text('Name'),
-              TextField(controller: nameCtrl),
-              const SizedBox(height: 20),
-
-              // Email
-              const Text('Email'),
-              TextField(controller: emailCtrl),
-              const SizedBox(height: 20),
-
-              // Password
-              const Text('Password'),
-              TextField(controller: passCtrl, obscureText: true),
-              const SizedBox(height: 20),
-
-              // Confirm Password
-              const Text('Confirm password'),
-              TextField(controller: confirmPassCtrl, obscureText: true),
-              const SizedBox(height: 20),
-
-              // Role
-              const Text('Role'),
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                ),
-                value: selectedRole,
-                items: const [
-                  DropdownMenuItem(value: 'Mahasiswa', child: Text('Mahasiswa')),
-                  DropdownMenuItem(value: 'Dosen', child: Text('Dosen')),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    selectedRole = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 32),
-
-              // Register Button
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryRed,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+    return ChangeNotifierProvider(
+      create: (context) => SignupController(),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: ListView(
+              children: [
+                const SizedBox(height: 60),
+                const Text(
+                  'Sign Up!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
                   ),
-                  onPressed: isLoading ? null : _register,
-                  child:
-                      isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('Register', style: TextStyle(color: Colors.white)),
                 ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Sign In link
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("Already have an Account? "),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.pop(context); // balik ke login
-                    },
-                    child: Text('Sign In', style: TextStyle(color: primaryRed, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                const Text(
+                  'Silahkan Buat Akun Terlebih Dahulu',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black54,
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 40),
+
+                // Name Field
+                const Text(
+                  'Name',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Consumer<SignupController>(
+                  builder: (context, controller, child) {
+                    return TextField(
+                      controller: controller.nameController,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        hintText: 'Masukkan nama lengkap',
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // Email Field
+                const Text(
+                  'Email',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Consumer<SignupController>(
+                  builder: (context, controller, child) {
+                    return TextField(
+                      controller: controller.emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        hintText: 'Masukkan email',
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // Password Field
+                const Text(
+                  'Password',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Consumer<SignupController>(
+                  builder: (context, controller, child) {
+                    return TextField(
+                      controller: controller.passwordController,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        hintText: 'Masukkan password',
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // Confirm Password Field
+                const Text(
+                  'Confirm Password',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Consumer<SignupController>(
+                  builder: (context, controller, child) {
+                    return TextField(
+                      controller: controller.confirmPasswordController,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        hintText: 'Konfirmasi password',
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // Role Field
+                const Text(
+                  'Role',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Consumer<SignupController>(
+                  builder: (context, controller, child) {
+                    return DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        hintText: 'Pilih role',
+                      ),
+                      value: controller.model.role,
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Mahasiswa',
+                          child: Text('Mahasiswa'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Dosen',
+                          child: Text('Dosen'),
+                        ),
+                      ],
+                      onChanged: controller.updateRole,
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+
+                // Register Button
+                Consumer<SignupController>(
+                  builder: (context, controller, child) {
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: controller.primaryRed,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          elevation: 2,
+                        ),
+                        onPressed: controller.model.isLoading
+                            ? null
+                            : () => controller.register(context),
+                        child: controller.model.isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'Register',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 24),
+
+                // Sign In Link
+                Consumer<SignupController>(
+                  builder: (context, controller, child) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          "Already have an Account? ",
+                          style: TextStyle(
+                            color: Colors.black54,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => controller.navigateToLogin(context),
+                          child: Text(
+                            'Sign In',
+                            style: TextStyle(
+                              color: controller.primaryRed,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),
