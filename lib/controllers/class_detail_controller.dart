@@ -59,10 +59,10 @@ class ClassDetailController with ChangeNotifier {
 
       if (_model.isDosen) {
         print("👨‍🏫 Loading postingan by dosen...");
-        postingan = await PostinganService.getPostinganByDosen(dosenId: dosenId);
+        postingan = await PostinganService.getPostinganByDosenAndJadwal(dosenId: dosenId, jadwalId: jadwalId);
       } else {
         print("👨‍🎓 Loading postingan by jadwal...");
-        postingan = await PostinganService.getPostinganByDosenAndJadwal(jadwalId: jadwalId, dosenId: dosenId);
+        postingan = await PostinganService.getPostinganByJadwal(jadwalId: jadwalId);
       }
 
       print("📊 _loadPostingan - Received ${postingan.length} postingan");
