@@ -209,6 +209,158 @@ class PostinganService {
     }
   }
 
+  /// Get semua postingan berdasarkan dosenId DAN jadwalId - KOMBINASI FILTER
+  static Future<List<Postingan>> getPostinganByDosenAndJadwal({required int dosenId, required int jadwalId}) async {
+    print("🚀 START getPostinganByDosenAndJadwal - dosenId: $dosenId, jadwalId: $jadwalId");
+
+    _validateRequiredParams(jadwalId: jadwalId);
+
+    if (dosenId <= 0) {
+      print("❌ Validation failed: dosenId harus lebih besar dari 0");
+      throw ArgumentError('dosenId harus lebih besar dari 0');
+    }
+
+    try {
+      final List<Postingan> allPostingan = [];
+      int page = 1;
+      bool hasMoreData = true;
+      int maxPages = 10;
+
+      print("🔄 Starting pagination loop for dosenId: $dosenId, jadwalId: $jadwalId");
+
+      while (hasMoreData && page <= maxPages) {
+        print("📖 Processing page $page");
+
+        final Map<String, String> queryParams = {
+          'dosenId': dosenId.toString(),
+          'jadwalId': jadwalId.toString(), // ✅ KOMBINASI DOSEN & JADWAL
+          'page': page.toString(),
+          'per_page': '10',
+        };
+
+        print("🌐 API Call - Endpoint: $endpoint, QueryParams: $queryParams");
+        final response = await ApiService.getRequest(endpoint, queryParams: queryParams);
+
+        print("📡 API Response - Status: ${response['statusCode']}, Page: $page");
+
+        if (response['statusCode'] == 200) {
+          final data = response['data'];
+          print("📊 Raw response data type: ${data.runtimeType}");
+          print("📊 Raw response data: $data");
+
+          List<dynamic> postinganList = [];
+
+          // Handle berbagai kemungkinan struktur response
+          if (data is List) {
+            print("📋 Response is direct List");
+            postinganList = data;
+          } else if (data['data'] is List) {
+            print("📋 Response has 'data' key with List");
+            postinganList = data['data'];
+          } else if (data['items'] is List) {
+            print("📋 Response has 'items' key with List");
+            postinganList = data['items'];
+          } else if (data['postingan'] is List) {
+            print("📋 Response has 'postingan' key with List");
+            postinganList = data['postingan'];
+          } else if (data['posts'] is List) {
+            print("📋 Response has 'posts' key with List");
+            postinganList = data['posts'];
+          } else {
+            print("⚠️ Unknown response structure, trying to extract any list");
+            // Coba cari key yang mengandung list
+            data.forEach((key, value) {
+              if (value is List) {
+                print("📋 Found list in key: $key");
+                postinganList = value;
+              }
+            });
+          }
+
+          print("📊 Page $page: Found ${postinganList.length} postingan items");
+
+          if (postinganList.isEmpty) {
+            hasMoreData = false;
+            print("✅ No more data at page $page - stopping pagination");
+          } else {
+            print("🔄 Processing ${postinganList.length} postingan items");
+
+            // Filter by dosenId dan jadwalId di client side (jika backend tidak support filter kombinasi)
+            final List<dynamic> filteredList =
+                postinganList.where((item) {
+                  final itemDosenId = item['dosenId'] ?? item['dosen_id'];
+                  final itemJadwalId = item['jadwalId'] ?? item['jadwal_id'];
+
+                  final bool matchesDosen = itemDosenId == dosenId;
+                  final bool matchesJadwal = itemJadwalId == jadwalId;
+
+                  print(
+                    "🔍 Item - dosenId: $itemDosenId, jadwalId: $itemJadwalId, matches: $matchesDosen & $matchesJadwal",
+                  );
+
+                  return matchesDosen && matchesJadwal;
+                }).toList();
+
+            print("🔍 After filtering: ${filteredList.length} items for dosenId: $dosenId & jadwalId: $jadwalId");
+
+            final List<Postingan> pagePostingan =
+                filteredList.map((json) {
+                  print("🔧 Mapping JSON to Postingan: $json");
+                  return Postingan.fromJson(json);
+                }).toList();
+
+            allPostingan.addAll(pagePostingan);
+            print("📈 Total postingan so far: ${allPostingan.length}");
+
+            // Cek apakah masih ada halaman berikutnya
+            final meta = data['meta'] ?? data['pagination'] ?? data['page_info'];
+            if (meta != null) {
+              print("📑 Pagination metadata found: $meta");
+              final int? currentPage = meta['current_page'] ?? meta['page'];
+              final int? lastPage = meta['last_page'] ?? meta['total_pages'];
+              final bool? hasNext = meta['has_next'] ?? meta['next_page'];
+
+              if (currentPage != null && lastPage != null && currentPage >= lastPage) {
+                hasMoreData = false;
+                print("✅ Reached last page: $currentPage/$lastPage");
+              } else if (hasNext != null && !hasNext) {
+                hasMoreData = false;
+                print("✅ No next page available");
+              } else {
+                page++;
+                print("➡️ Moving to next page: $page");
+              }
+            } else {
+              // Jika tidak ada metadata, asumsikan single page
+              hasMoreData = false;
+              print("✅ No pagination metadata - assuming single page");
+            }
+          }
+        } else {
+          print("❌ API Error - Status: ${response['statusCode']}, Data: ${response['data']}");
+          hasMoreData = false;
+
+          // Jika 404 atau error lain, return empty list
+          if (response['statusCode'] == 404) {
+            print("⚠️ Endpoint not found (404) - returning empty list");
+            return [];
+          }
+
+          throw Exception('Failed to load postingan: ${response['data']['message'] ?? 'Unknown error'}');
+        }
+      }
+
+      print(
+        "🎉 FINISHED getPostinganByDosenAndJadwal - Total: ${allPostingan.length} postingan for dosenId: $dosenId & jadwalId: $jadwalId",
+      );
+      return allPostingan;
+    } catch (e) {
+      print("💥 ERROR in getPostinganByDosenAndJadwal: $e");
+      print("🔄 Returning empty list due to error");
+      return [];
+    }
+  }
+
   // Create new postingan - DISESUAIKAN dengan format JSON (tanpa judul)
   // Create new postingan - DISESUAIKAN dengan format JSON dan ApiService
   static Future<Map<String, dynamic>> createPostingan({
