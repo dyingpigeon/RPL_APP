@@ -372,10 +372,10 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/edit_profile_model.dart';
 import '../services/auth_service.dart';
-import '../utils/pemission_handler.dart';
-import 'package:permission_handler/permission_handler.dart';
+import '../utils/pemission_handler.dart'; // Pastikan path benar
 
 class EditProfileController with ChangeNotifier {
   EditProfileModel _model = EditProfileModel();
@@ -477,44 +477,127 @@ class EditProfileController with ChangeNotifier {
   }
 
   // ============================
-  // PHOTO UPDATE METHODS - BARU
+  // PHOTO UPDATE METHODS - DIPERBAIKI
   // ============================
 
-  /// Memilih foto dari gallery
-  // Future<void> pickImageFromGallery() async {
-  //   try {
-  //     final XFile? pickedFile = await _imagePicker.pickImage(
-  //       source: ImageSource.gallery,
-  //       maxWidth: 800,
-  //       maxHeight: 800,
-  //       imageQuality: 80,
-  //     );
+  // Di EditProfileController - UPDATE METHOD PHOTO
+  // Di EditProfileController - OPTIMIZED FOR ANDROID 11+
+  Future<void> pickImageFromGallery() async {
+    try {
+      print('📱 Starting gallery pick process...');
 
-  //     if (pickedFile != null) {
-  //       await _updateProfilePhoto(pickedFile.path);
-  //     }
-  //   } catch (e) {
-  //     _showSnackBar("Gagal memilih foto: ${e.toString()}");
-  //   }
-  // }
+      // Debug permissions terlebih dahulu
+      await AppPermissionHandler.debugPermissions();
 
-  // /// Mengambil foto dari kamera
-  // Future<void> takePhotoFromCamera() async {
-  //   try {
-  //     final XFile? pickedFile = await _imagePicker.pickImage(
-  //       source: ImageSource.camera,
-  //       maxWidth: 800,
-  //       maxHeight: 800,
-  //       imageQuality: 80,
-  //     );
+      // ✅ CHECK SPECIAL: Android 11+ tidak butuh permission
+      final isAndroid11Plus = await AppPermissionHandler.canAccessGalleryWithoutPermission();
 
-  //     if (pickedFile != null) {
-  //       await _updateProfilePhoto(pickedFile.path);
-  //     }
-  //   } catch (e) {
-  //     _showSnackBar("Gagal mengambil foto: ${e.toString()}");
-  //   }
-  // }
+      if (isAndroid11Plus) {
+        print('✅ Android 11+ - No permission needed, opening gallery directly');
+        // Langsung buka gallery tanpa permission check
+        final XFile? pickedFile = await _imagePicker.pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 800,
+          maxHeight: 800,
+          imageQuality: 80,
+        );
+
+        if (pickedFile != null) {
+          await _updateProfilePhoto(pickedFile.path);
+        }
+        return;
+      }
+
+      // ❌ Android <11 butuh permission check
+      print('📱 Android <11 - Checking permissions...');
+      final permissions = await AppPermissionHandler.checkPhotoPermissions();
+      final hasPermission = permissions['gallery'] == true;
+
+      print('🔐 Gallery permission status: $hasPermission');
+
+      if (!hasPermission) {
+        print('🔐 Permission not granted, requesting...');
+        final newPermissions = await AppPermissionHandler.requestPhotoPermissions();
+        final hasNewPermission = newPermissions['gallery'] == true;
+
+        if (!hasNewPermission) {
+          _showSnackBar("Izin akses gallery diperlukan untuk memilih foto");
+          _showPermissionSettingsDialog("Gallery");
+          return;
+        }
+      }
+
+      print('✅ Permission granted, opening gallery...');
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        await _updateProfilePhoto(pickedFile.path);
+      }
+    } catch (e) {
+      print('❌ Gallery pick error: $e');
+      _showSnackBar("Gagal membuka gallery: ${e.toString()}");
+    }
+  }
+
+  /// Mengambil foto dari kamera dengan permission check
+  Future<void> takePhotoFromCamera() async {
+    try {
+      print('📱 Checking camera permission...');
+
+      // Check camera permission
+      final hasPermission = await _checkCameraPermission();
+
+      if (!hasPermission) {
+        _showSnackBar("Izin akses kamera diperlukan untuk mengambil foto");
+        _showPermissionSettingsDialog("Kamera");
+        return;
+      }
+
+      print('✅ Camera permission granted, opening camera...');
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        print('📸 Photo taken: ${pickedFile.path}');
+        await _updateProfilePhoto(pickedFile.path);
+      } else {
+        print('ℹ️ User cancelled camera');
+      }
+    } catch (e) {
+      print('❌ Camera pick error: $e');
+
+      if (e.toString().contains('PERMISSION_DENIED') || e.toString().contains('permission')) {
+        _showSnackBar("Izin akses kamera ditolak");
+        _showPermissionSettingsDialog("Kamera");
+      } else {
+        _showSnackBar("Gagal mengambil foto: ${e.toString()}");
+      }
+    }
+  }
+
+  /// Check camera permission khusus
+  Future<bool> _checkCameraPermission() async {
+    try {
+      final status = await Permission.camera.status;
+      if (status.isGranted) return true;
+
+      // Request permission jika belum granted
+      final result = await Permission.camera.request();
+      return result.isGranted;
+    } catch (e) {
+      print('❌ Camera permission check error: $e');
+      return false;
+    }
+  }
 
   /// Mengupdate foto profil ke server
   Future<void> _updateProfilePhoto(String photoPath) async {
@@ -573,17 +656,50 @@ class EditProfileController with ChangeNotifier {
                 children: [Icon(Icons.photo_library), SizedBox(width: 8), Text("Gallery")],
               ),
             ),
+            // males bused
+            // TextButton(
+            //   onPressed: () {
+            //     Navigator.of(context).pop();
+            //     takePhotoFromCamera();
+            //   },
+            //   child: const Row(
+            //     mainAxisSize: MainAxisSize.min,
+            //     children: [Icon(Icons.camera_alt), SizedBox(width: 8), Text("Kamera")],
+            //   ),
+            // ),
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text("Batal")),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showPermissionSettingsDialog(String permissionType) {
+    if (navigatorKey.currentContext == null) {
+      _showSnackBar("Izin $permissionType diperlukan. Buka pengaturan aplikasi untuk memberikan izin.");
+      return;
+    }
+
+    showDialog(
+      context: navigatorKey.currentContext!,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: Text("Izin $permissionType Diperlukan"),
+          content: Text(
+            "Aplikasi membutuhkan akses $permissionType "
+            "untuk mengupload foto profil. Silakan berikan izin melalui pengaturan.",
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text("Nanti")),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                takePhotoFromCamera();
+                // ✅ Direct call ke openAppSettings
+                openAppSettings();
               },
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [Icon(Icons.camera_alt), SizedBox(width: 8), Text("Kamera")],
-              ),
+              child: const Text("Buka Pengaturan"),
             ),
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text("Batal")),
           ],
         );
       },
@@ -790,12 +906,7 @@ class EditProfileController with ChangeNotifier {
           title: Text("Logout", style: TextStyle(fontWeight: FontWeight.bold, color: primaryRed)),
           content: const Text("Apakah Anda yakin ingin keluar?"),
           actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text("Batal"),
-            ),
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text("Batal")),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: primaryRed),
               onPressed: () async {
@@ -819,12 +930,10 @@ class EditProfileController with ChangeNotifier {
       _model = _model.copyWith(isLoading: false);
       if (!_isDisposed) notifyListeners();
 
-      // ✅ GUNAKAN NAVIGATOR KEY - Lebih aman
       navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
     } catch (e) {
       _model = _model.copyWith(isLoading: false);
       if (!_isDisposed) notifyListeners();
-
       _showSnackBar("Error saat logout: ${e.toString()}");
     }
   }
@@ -864,115 +973,7 @@ class EditProfileController with ChangeNotifier {
     nipController.clear();
     if (!_isDisposed) notifyListeners();
   }
-
-  // Di EditProfileController - PERBAIKI METHOD PHOTO
-  // Di EditProfileController - PERBAIKI METHOD PHOTO
-  // Di EditProfileController - PERBAIKI METHOD PHOTO
-  Future<void> pickImageFromGallery() async {
-    try {
-      // Cek permission sederhana
-      final permissions = await AppPermissionHandler.checkPhotoPermissions();
-      final hasPermission = permissions['photos'] == true || permissions['storage'] == true;
-
-      if (!hasPermission) {
-        // Request permission
-        final newPermissions = await AppPermissionHandler.requestPhotoPermissions();
-        final hasNewPermission = newPermissions['photos'] == true || newPermissions['storage'] == true;
-
-        if (!hasNewPermission) {
-          _showSnackBar("Izin akses gallery diperlukan untuk memilih foto");
-          _showPermissionSettingsDialog("Gallery");
-          return;
-        }
-      }
-
-      final XFile? pickedFile = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 80,
-      );
-
-      if (pickedFile != null) {
-        await _updateProfilePhoto(pickedFile.path);
-      }
-    } catch (e) {
-      print('❌ Gallery pick error: $e');
-
-      // Handle permission error
-      if (e.toString().contains('PERMISSION_DENIED')) {
-        _showSnackBar("Izin akses gallery ditolak");
-        _showPermissionSettingsDialog("Gallery");
-      } else {
-        _showSnackBar("Gagal memilih foto dari gallery: ${e.toString()}");
-      }
-    }
-  }
-
-  void _showPermissionSettingsDialog(String permissionType) {
-    if (navigatorKey.currentContext == null) {
-      _showSnackBar("Izin $permissionType diperlukan. Buka pengaturan aplikasi untuk memberikan izin.");
-      return;
-    }
-
-    showDialog(
-      context: navigatorKey.currentContext!,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: Text("Izin $permissionType Diperlukan"),
-          content: Text(
-            "Aplikasi membutuhkan akses $permissionType "
-            "untuk mengupload foto profil. Silakan berikan izin melalui pengaturan.",
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text("Nanti")),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // ✅ LANGSUNG PANGGIL openAppSettings() DARI PACKAGE
-                openAppSettings();
-              },
-              child: const Text("Buka Pengaturan"),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> takePhotoFromCamera() async {
-    try {
-      // Check camera permission
-      final permissions = await AppPermissionHandler.checkPhotoPermissions();
-
-      if (permissions['camera'] != true) {
-        final newPermissions = await AppPermissionHandler.requestPhotoPermissions();
-
-        if (newPermissions['camera'] != true) {
-          _showSnackBar("Izin akses kamera diperlukan untuk mengambil foto");
-
-          // Tawarkan untuk buka settings
-          _showPermissionSettingsDialog("camera");
-          return;
-        }
-      }
-
-      final XFile? pickedFile = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 80,
-      );
-
-      if (pickedFile != null) {
-        await _updateProfilePhoto(pickedFile.path);
-      }
-    } catch (e) {
-      print('❌ Camera pick error: $e');
-      _showSnackBar("Gagal mengambil foto dari kamera: ${e.toString()}");
-    }
-  }
+}
 
   // Dialog untuk membuka settings - TANPA PARAMETER CONTEXT
   // void _showPermissionSettingsDialog(String permissionType) {
@@ -1008,4 +1009,3 @@ class EditProfileController with ChangeNotifier {
   //     },
   //   );
   // }
-}

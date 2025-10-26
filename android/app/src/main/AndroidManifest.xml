@@ -1,15 +1,24 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools   ">
     <!-- Basic permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
-    <!-- Camera and Storage permissions -->
+    <!-- Camera permission -->
     <uses-permission android:name="android.permission.CAMERA" />
+    
+    <!-- Storage permissions untuk Android < 11 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     
-    <!-- Untuk Android 13+ (API 33+) - INI YANG DIBUTUHKAN -->
+    <!-- Untuk Android 11+ (API 30+) - MANAGE_EXTERNAL_STORAGE untuk full access -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    
+    <!-- Untuk Android 13+ (API 33+) - NEW PERMISSIONS -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
     <application
         android:label="SETRUM"
@@ -17,7 +26,8 @@
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config"
-        android:requestLegacyExternalStorage="true">
+        android:requestLegacyExternalStorage="true"
+        android:enableOnBackInvokedCallback="true">
         
         <activity
             android:name=".MainActivity"
@@ -27,7 +37,8 @@
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+            android:enableOnBackInvokedCallback="true">
             
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
@@ -48,6 +59,19 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        
+        <!-- Query untuk image picker -->
+        <intent>
+            <action android:name="android.intent.action.GET_CONTENT" />
+            <data android:mimeType="image/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PICK" />
+            <data android:mimeType="image/*" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
     </queries>
 </manifest>
