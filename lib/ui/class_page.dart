@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../controllers/class_controller.dart';
+import '../services/auth_service.dart';
 
 class ClassPage extends StatefulWidget {
   const ClassPage({super.key});
@@ -23,25 +25,68 @@ class _ClassPageState extends State<ClassPage> {
               elevation: 0,
               title: Text(
                 controller.model.greeting,
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
               ),
-              actions: const [
-                Padding(
-                  padding: EdgeInsets.only(right: 12),
-                  child: CircleAvatar(
-                    radius: 18,
-                    backgroundImage: AssetImage("assets/profile.jpg"),
-                  ),
-                ),
-              ],
+              actions: [Padding(padding: const EdgeInsets.only(right: 12), child: _buildProfileAvatar())],
             ),
             body: _buildBody(controller),
           );
         },
       ),
+    );
+  }
+
+  Widget _buildProfileAvatar() {
+    return FutureBuilder<String?>(
+      future: AuthService.getUserPhotoUrl(),
+      builder: (context, snapshot) {
+        final String? photoUrl = snapshot.data;
+        final bool hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+        final bool isLoading = snapshot.connectionState == ConnectionState.waiting;
+
+        if (isLoading) {
+          return CircleAvatar(
+            radius: 18,
+            backgroundColor: Colors.grey[300],
+            child: const CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+            ),
+          );
+        }
+
+        if (hasPhoto) {
+          return CachedNetworkImage(
+            imageUrl: photoUrl!,
+            imageBuilder: (context, imageProvider) => CircleAvatar(radius: 18, backgroundImage: imageProvider),
+            placeholder:
+                (context, url) => CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.grey[300],
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                  ),
+                ),
+            errorWidget:
+                (context, url, error) => CircleAvatar(
+                  radius: 18,
+                  backgroundColor: const Color(0xFFB71C1C),
+                  child: const Icon(Icons.person, size: 20, color: Colors.white),
+                ),
+          );
+        } else {
+          return _buildDefaultAvatar();
+        }
+      },
+    );
+  }
+
+  Widget _buildDefaultAvatar() {
+    return CircleAvatar(
+      radius: 18,
+      backgroundColor: const Color(0xFFB71C1C),
+      child: const Icon(Icons.person, size: 20, color: Colors.white),
     );
   }
 
@@ -56,9 +101,7 @@ class _ClassPageState extends State<ClassPage> {
 
   Widget _buildContent(ClassController controller) {
     if (controller.model.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (controller.model.hasError) {
@@ -82,10 +125,7 @@ class _ClassPageState extends State<ClassPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 4),
-        Text(
-          controller.formatFullDate(controller.model.currentDate),
-          style: const TextStyle(color: Colors.black54),
-        ),
+        Text(controller.formatFullDate(controller.model.currentDate), style: const TextStyle(color: Colors.black54)),
         const SizedBox(height: 16),
       ],
     );
@@ -131,10 +171,7 @@ class _ClassPageState extends State<ClassPage> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => controller.fetchJadwal(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: controller.primaryRed,
-                foregroundColor: Colors.white,
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: controller.primaryRed, foregroundColor: Colors.white),
               child: const Text('Coba Lagi'),
             ),
           ],
@@ -180,13 +217,7 @@ class _ClassPageState extends State<ClassPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 6, offset: const Offset(0, 2))],
           border: Border.all(color: controller.primaryRed.withOpacity(0.3)),
         ),
         child: Row(
@@ -194,27 +225,18 @@ class _ClassPageState extends State<ClassPage> {
             Container(
               width: 4,
               height: 60,
-              decoration: BoxDecoration(
-                color: controller.primaryRed,
-                borderRadius: BorderRadius.circular(2),
-              ),
+              decoration: BoxDecoration(color: controller.primaryRed, borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text(dosen, style: const TextStyle(color: Colors.black54)),
                   const SizedBox(height: 2),
-                  Text(
-                    scheduleInfo,
-                    style: const TextStyle(color: Colors.black54, fontSize: 12),
-                  ),
+                  Text(scheduleInfo, style: const TextStyle(color: Colors.black54, fontSize: 12)),
                   const SizedBox(height: 4),
                   Text(
                     '$ruangan • $jamMulai - $jamSelesai',

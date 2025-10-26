@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../controllers/home_controller.dart';
 import 'class_detail_page.dart';
 import 'assignment_page.dart';
@@ -84,9 +85,63 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
-          const CircleAvatar(radius: 28, backgroundImage: AssetImage('assets/profile.jpg')),
+          _buildProfileAvatar(),
         ],
       ),
+    );
+  }
+
+  Widget _buildProfileAvatar() {
+    return FutureBuilder<String?>(
+      future: AuthService.getUserPhotoUrl(),
+      builder: (context, snapshot) {
+        final String? photoUrl = snapshot.data;
+        final bool hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+        final bool isLoading = snapshot.connectionState == ConnectionState.waiting;
+
+        if (isLoading) {
+          return CircleAvatar(
+            radius: 28,
+            backgroundColor: Colors.white.withOpacity(0.3),
+            child: const CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          );
+        }
+
+        if (hasPhoto) {
+          return CachedNetworkImage(
+            imageUrl: photoUrl,
+            imageBuilder: (context, imageProvider) => CircleAvatar(radius: 28, backgroundImage: imageProvider),
+            placeholder:
+                (context, url) => CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Colors.white.withOpacity(0.3),
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+            errorWidget:
+                (context, url, error) => CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Colors.white.withOpacity(0.3),
+                  child: const Icon(Icons.person, size: 32, color: Colors.white),
+                ),
+          );
+        } else {
+          return _buildDefaultAvatar();
+        }
+      },
+    );
+  }
+
+  Widget _buildDefaultAvatar() {
+    return CircleAvatar(
+      radius: 28,
+      backgroundColor: Colors.white.withOpacity(0.3),
+      child: const Icon(Icons.person, size: 32, color: Colors.white),
     );
   }
 

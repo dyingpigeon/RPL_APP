@@ -42,36 +42,29 @@ class EditProfileController with ChangeNotifier {
     print("===============================");
   }
 
-  Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
+  // Future<void> _loadUserData() async {
+  //   final prefs = await SharedPreferences.getInstance();
 
-    // Dapatkan role user
-    final role = prefs.getString('userRole') ?? 'mahasiswa';
+  //   // Dapatkan role user
+  //   final role = prefs.getString('userRole') ?? 'mahasiswa';
 
-    _model = _model.copyWith(
-      userRole: role,
-      userId: prefs.getInt('user_id'),
-    );
-    
-    namaController.text = prefs.getString('userName') ?? '';
+  //   _model = _model.copyWith(userRole: role, userId: prefs.getInt('user_id'));
 
-    // Load data berdasarkan role
-    if (role == 'mahasiswa') {
-      _model = _model.copyWith(
-        mahasiswaId: prefs.getInt('mahasiswa_id'),
-      );
-      nimController.text = prefs.getString('mahasiswa_nim') ?? '';
-      kelasController.text = prefs.getString('mahasiswa_kelas') ?? '';
-      prodiController.text = prefs.getString('mahasiswa_prodi') ?? '';
-    } else if (role == 'dosen') {
-      _model = _model.copyWith(
-        dosenId: prefs.getInt('dosen_id'),
-      );
-      nipController.text = prefs.getString('dosen_nip') ?? '';
-    }
+  //   namaController.text = prefs.getString('userName') ?? '';
 
-    notifyListeners();
-  }
+  //   // Load data berdasarkan role
+  //   if (role == 'mahasiswa') {
+  //     _model = _model.copyWith(mahasiswaId: prefs.getInt('mahasiswa_id'));
+  //     nimController.text = prefs.getString('mahasiswa_nim') ?? '';
+  //     kelasController.text = prefs.getString('mahasiswa_kelas') ?? '';
+  //     prodiController.text = prefs.getString('mahasiswa_prodi') ?? '';
+  //   } else if (role == 'dosen') {
+  //     _model = _model.copyWith(dosenId: prefs.getInt('dosen_id'));
+  //     nipController.text = prefs.getString('dosen_nip') ?? '';
+  //   }
+
+  //   notifyListeners();
+  // }
 
   Future<void> saveProfile(BuildContext context) async {
     if (!_model.hasUserData) {
@@ -113,10 +106,7 @@ class EditProfileController with ChangeNotifier {
       kelas: kelasController.text,
     );
 
-    final resultUser = await AuthService.updateUser(
-      idu: _model.userId!, 
-      nama: namaController.text
-    );
+    final resultUser = await AuthService.updateUser(idu: _model.userId!, nama: namaController.text);
 
     _model = _model.copyWith(isLoading: false);
     notifyListeners();
@@ -159,10 +149,7 @@ class EditProfileController with ChangeNotifier {
     );
 
     // Update data user (nama)
-    final resultUser = await AuthService.updateUser(
-      idu: _model.userId!, 
-      nama: namaController.text
-    );
+    final resultUser = await AuthService.updateUser(idu: _model.userId!, nama: namaController.text);
 
     _model = _model.copyWith(isLoading: false);
     notifyListeners();
@@ -195,10 +182,7 @@ class EditProfileController with ChangeNotifier {
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: Text(
-            "Logout", 
-            style: TextStyle(fontWeight: FontWeight.bold, color: primaryRed)
-          ),
+          title: Text("Logout", style: TextStyle(fontWeight: FontWeight.bold, color: primaryRed)),
           content: const Text("Apakah Anda yakin ingin keluar?"),
           actions: [
             TextButton(
@@ -223,13 +207,9 @@ class EditProfileController with ChangeNotifier {
   }
 
   void _showSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: primaryRed,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: primaryRed, duration: const Duration(seconds: 3)));
   }
 
   String getRoleDisplayName() {
@@ -239,6 +219,39 @@ class EditProfileController with ChangeNotifier {
   String getSaveButtonText() {
     return "Simpan Profil ${getRoleDisplayName()}";
   }
+
+  String? _userPhotoUrl;
+
+  String? get userPhotoUrl => _userPhotoUrl;
+
+  // Update _loadUserData method
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final role = prefs.getString('userRole') ?? 'mahasiswa';
+
+    _model = _model.copyWith(userRole: role, userId: prefs.getInt('user_id'));
+
+    namaController.text = prefs.getString('userName') ?? '';
+
+    // LOAD FOTO PROFILE dari SharedPreferences
+    _userPhotoUrl = prefs.getString('user_photo_url');
+
+    // Load data berdasarkan role
+    if (role == 'mahasiswa') {
+      _model = _model.copyWith(mahasiswaId: prefs.getInt('mahasiswa_id'));
+      nimController.text = prefs.getString('mahasiswa_nim') ?? '';
+      kelasController.text = prefs.getString('mahasiswa_kelas') ?? '';
+      prodiController.text = prefs.getString('mahasiswa_prodi') ?? '';
+    } else if (role == 'dosen') {
+      _model = _model.copyWith(dosenId: prefs.getInt('dosen_id'));
+      nipController.text = prefs.getString('dosen_nip') ?? '';
+    }
+
+    notifyListeners();
+  }
+
+  // Method untuk check jika ada foto
+  bool get hasProfilePhoto => _userPhotoUrl != null && _userPhotoUrl!.isNotEmpty;
 
   @override
   void dispose() {

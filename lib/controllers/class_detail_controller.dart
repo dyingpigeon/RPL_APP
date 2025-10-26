@@ -3,6 +3,7 @@ import '../models/class_detail_model.dart';
 import '../services/postingan_service.dart';
 import '../services/dosen_service.dart';
 import '../services/auth_service.dart';
+import '../services/tugas_service.dart'; // ✅ IMPORT BARU
 
 class ClassDetailController with ChangeNotifier {
   final String className;
@@ -40,10 +41,7 @@ class ClassDetailController with ChangeNotifier {
 
       print("📊 User data - Role: $role, Name: $name");
 
-      _model = _model.copyWith(
-        userRole: role ?? 'mahasiswa',
-        userName: name ?? 'User',
-      );
+      _model = _model.copyWith(userRole: role ?? 'mahasiswa', userName: name ?? 'User');
       notifyListeners();
       print("✅ _loadUserData completed - Role: ${_model.userRole}, Name: ${_model.userName}");
     } catch (e) {
@@ -54,10 +52,7 @@ class ClassDetailController with ChangeNotifier {
   Future<void> _loadPostingan() async {
     try {
       print("🔄 START _loadPostingan - jadwalId: $jadwalId, userRole: ${_model.userRole}");
-      _model = _model.copyWith(
-        isLoading: true,
-        errorMessage: '',
-      );
+      _model = _model.copyWith(isLoading: true, errorMessage: '');
       notifyListeners();
 
       List<Postingan> postingan = [];
@@ -72,18 +67,12 @@ class ClassDetailController with ChangeNotifier {
 
       print("📊 _loadPostingan - Received ${postingan.length} postingan");
 
-      _model = _model.copyWith(
-        postinganList: postingan,
-        isLoading: false,
-      );
+      _model = _model.copyWith(postinganList: postingan, isLoading: false);
       notifyListeners();
       print("✅ _loadPostingan completed - ${_model.postinganList.length} postingan loaded");
     } catch (e) {
       print("❌ ERROR in _loadPostingan: $e");
-      _model = _model.copyWith(
-        isLoading: false,
-        errorMessage: e.toString(),
-      );
+      _model = _model.copyWith(isLoading: false, errorMessage: e.toString());
       notifyListeners();
     }
   }
@@ -104,7 +93,58 @@ class ClassDetailController with ChangeNotifier {
     }
   }
 
-  Future<void> createPostingan(BuildContext context) async {
+  // ✅ METHOD BARU: CREATE TUGAS
+  Future<void> createTugas(BuildContext context, Map<String, dynamic> tugasData) async {
+    try {
+      print("🚀 START createTugas - Data: $tugasData");
+
+      // Validasi data
+      if (tugasData["judul"] == null || tugasData["judul"]!.isEmpty) {
+        throw Exception("Judul tugas tidak boleh kosong");
+      }
+
+      if (tugasData["deadline"] == null || tugasData["deadline"]!.isEmpty) {
+        throw Exception("Deadline tugas tidak boleh kosong");
+      }
+
+      _model = _model.copyWith(isLoading: true);
+      notifyListeners();
+
+      final result = await TugasService.postTugas(
+        judul: tugasData["judul"]!,
+        deskripsi: tugasData["deskripsi"] ?? "",
+        deadline: tugasData["deadline"]!,
+        jadwalId: jadwalId, // Gunakan jadwalId dari controller
+      );
+
+      print("📡 createTugas response - Success: ${result['success']}");
+
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? 'Tugas berhasil dibuat'), backgroundColor: Colors.green),
+        );
+        print("✅ Tugas created successfully");
+
+        // Kembali ke halaman sebelumnya
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? 'Gagal membuat tugas'), backgroundColor: Colors.red),
+        );
+        print("❌ Tugas creation failed");
+      }
+    } catch (e) {
+      print("❌ ERROR in createTugas: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Gagal membuat tugas: $e'), backgroundColor: Colors.red));
+    } finally {
+      _model = _model.copyWith(isLoading: false);
+      notifyListeners();
+    }
+  }
+
+  Future<void> createPostingan(BuildContext context, {String? content}) async {
     print("🚀 START createPostingan - userRole: ${_model.userRole}");
 
     if (!_model.canCreatePostingan) {
@@ -112,78 +152,85 @@ class ClassDetailController with ChangeNotifier {
       return;
     }
 
-    final TextEditingController judulController = TextEditingController();
-    final TextEditingController kontenController = TextEditingController();
+    // Jika ada content, langsung buat postingan tanpa dialog
+    if (content != null && content.isNotEmpty) {
+      await _submitPostingan(context, "Pengumuman", content);
+      return;
+    }
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Buat Pengumuman'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Kelas: $className', style: const TextStyle(fontSize: 14, color: Colors.grey)),
-              const SizedBox(height: 16),
-              TextField(
-                controller: judulController,
-                decoration: const InputDecoration(
-                  labelText: 'Judul Pengumuman',
-                  hintText: 'Masukkan judul pengumuman...',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                maxLines: 1,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: kontenController,
-                decoration: const InputDecoration(
-                  labelText: 'Isi Pengumuman',
-                  hintText: 'Masukkan isi pengumuman...',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                maxLines: 4,
-                textInputAction: TextInputAction.done,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              print("❌ Create postingan cancelled");
-              Navigator.pop(context);
-            },
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final judul = judulController.text.trim();
-              final konten = kontenController.text.trim();
+    // final TextEditingController judulController = TextEditingController();
+    // final TextEditingController kontenController = TextEdirrtingController();
 
-              print("📝 Validating postingan - Judul: $judul, Konten: $konten");
+    // showDialog(
+    //   context: context,
+    //   builder:
+    //       (context) => AlertDialog(
+    //         title: const Text('Buat Pengumuman'),
+    //         content: SingleChildScrollView(
+    //           child: Column(
+    //             mainAxisSize: MainAxisSize.min,
+    //             children: [
+    //               Text('Kelas: $className', style: const TextStyle(fontSize: 14, color: Colors.grey)),
+    //               const SizedBox(height: 16),
+    //               TextField(
+    //                 controller: judulController,
+    //                 decoration: const InputDecoration(
+    //                   labelText: 'Judul Pengumuman',
+    //                   hintText: 'Masukkan judul pengumuman...',
+    //                   border: OutlineInputBorder(),
+    //                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    //                 ),
+    //                 maxLines: 1,
+    //                 textInputAction: TextInputAction.next,
+    //               ),
+    //               const SizedBox(height: 12),
+    //               TextField(
+    //                 controller: kontenController,
+    //                 decoration: const InputDecoration(
+    //                   labelText: 'Isi Pengumuman',
+    //                   hintText: 'Masukkan isi pengumuman...',
+    //                   border: OutlineInputBorder(),
+    //                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+    //                 ),
+    //                 maxLines: 4,
+    //                 textInputAction: TextInputAction.done,
+    //               ),
+    //             ],
+    //           ),
+    //         ),
+    //         actions: [
+    //           TextButton(
+    //             onPressed: () {
+    //               print("❌ Create postingan cancelled");
+    //               Navigator.pop(context);
+    //             },
+    //             child: const Text('Batal'),
+    //           ),
+    //           ElevatedButton(
+    //             onPressed: () async {
+    //               final judul = judulController.text.trim();
+    //               final konten = kontenController.text.trim();
 
-              if (judul.isEmpty || konten.isEmpty) {
-                print("⚠️ Validation failed - judul or konten is empty");
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Judul dan isi pengumuman tidak boleh kosong')),
-                );
-                return;
-              }
+    //               print("📝 Validating postingan - Judul: $judul, Konten: $konten");
 
-              print("✅ Validation passed, proceeding with submission");
-              Navigator.pop(context);
-              await _submitPostingan(context, judul, konten);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: primaryRed),
-            child: const Text('Buat', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
+    //               if (judul.isEmpty || konten.isEmpty) {
+    //                 print("⚠️ Validation failed - judul or konten is empty");
+    //                 ScaffoldMessenger.of(
+    //                   context,
+    //                 ).showSnackBar(const SnackBar(content: Text('Judul dan isi pengumuman tidak boleh kosong')));
+    //                 return;
+    //               }
+
+    //               print("✅ Validation passed, proceeding with submission");
+    //               Navigator.pop(context);
+    //               await _submitPostingan(context, judul, konten);
+    //             },
+    //             style: ElevatedButton.styleFrom(backgroundColor: primaryRed),
+    //             child: const Text('Buat', style: TextStyle(color: Colors.white)),
+    //           ),
+    //         ],
+    //       ),
+    // );
   }
 
   Future<void> _submitPostingan(BuildContext context, String judul, String konten) async {
@@ -192,31 +239,25 @@ class ClassDetailController with ChangeNotifier {
       _model = _model.copyWith(isLoading: true);
       notifyListeners();
 
-      final result = await PostinganService.createPostingan(
-        jadwalId: jadwalId,
-        judul: judul,
-        konten: konten,
-      );
+      final result = await PostinganService.createPostingan(jadwalId: jadwalId, judul: judul, konten: konten);
 
       print("📡 _submitPostingan response - Success: ${result['success']}, Message: ${result['message']}");
 
       if (result['success'] == true) {
         await _loadPostingan();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Pengumuman berhasil dibuat')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Pengumuman berhasil dibuat')));
         print("✅ Postingan created successfully");
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Gagal membuat pengumuman')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Gagal membuat pengumuman')));
         print("❌ Postingan creation failed");
       }
     } catch (e) {
       print("❌ ERROR in _submitPostingan: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal membuat pengumuman: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal membuat pengumuman: $e')));
     } finally {
       _model = _model.copyWith(isLoading: false);
       notifyListeners();
@@ -225,32 +266,33 @@ class ClassDetailController with ChangeNotifier {
 
   Future<void> deletePostingan(BuildContext context, int postinganId, String judul) async {
     print("🚀 START deletePostingan - postinganId: $postinganId");
-    
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hapus Postingan'),
-        content: Text(
-          'Apakah Anda yakin ingin menghapus postingan: "${judul.length > 50 ? '${judul.substring(0, 50)}...' : judul}"?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              print("❌ Delete cancelled");
-              Navigator.pop(context);
-            },
-            child: const Text('Batal'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Hapus Postingan'),
+            content: Text(
+              'Apakah Anda yakin ingin menghapus postingan: "${judul.length > 50 ? '${judul.substring(0, 50)}...' : judul}"?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  print("❌ Delete cancelled");
+                  Navigator.pop(context);
+                },
+                child: const Text('Batal'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  print("✅ Delete confirmed");
+                  Navigator.pop(context);
+                  await _performDeletePostingan(context, postinganId);
+                },
+                child: const Text('Hapus', style: TextStyle(color: Colors.red)),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () async {
-              print("✅ Delete confirmed");
-              Navigator.pop(context);
-              await _performDeletePostingan(context, postinganId);
-            },
-            child: const Text('Hapus', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
     );
   }
 
@@ -262,21 +304,19 @@ class ClassDetailController with ChangeNotifier {
 
       if (result['success'] == true) {
         await _loadPostingan();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Postingan berhasil dihapus')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Postingan berhasil dihapus')));
         print("✅ Postingan deleted successfully");
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result['message'] ?? 'Gagal menghapus postingan')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Gagal menghapus postingan')));
         print("❌ Postingan deletion failed");
       }
     } catch (e) {
       print("❌ ERROR in _deletePostingan: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menghapus postingan: $e')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menghapus postingan: $e')));
     }
   }
 

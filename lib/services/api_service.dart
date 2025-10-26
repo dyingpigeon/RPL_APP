@@ -4,7 +4,7 @@ import 'auth_service.dart';
 
 class ApiService {
   static const String baseUrl = 'http://192.168.18.21:8000/api/v2';
-  // static const String baseUrl = 'https://ecd08a6c5ece.ngrok-free.app/api/v1';
+  //static const String baseUrl = 'https://ecd08a6c5ece.ngrok-free.app/api/v2';
 
   // Helper method untuk mendapatkan token dengan fallback ke AuthService
   static Future<String?> _getToken({String? token}) async {
@@ -60,7 +60,6 @@ class ApiService {
 
   // Helper GET request dengan support query parameters dan token otomatis
   static Future<Map<String, dynamic>> getRequest(
-    
     String endpoint, {
     Map<String, String>? queryParams,
     String? token,

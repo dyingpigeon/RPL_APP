@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../controllers/class_detail_controller.dart';
 import '../services/postingan_service.dart';
+import 'create_assignment_page.dart';
 
 class ClassDetail extends StatefulWidget {
   final String className;
@@ -54,12 +55,6 @@ class _ClassDetailState extends State<ClassDetail> {
                   onPressed: () => controller.refreshData(),
                   tooltip: 'Refresh',
                 ),
-                if (controller.model.canCreatePostingan)
-                  IconButton(
-                    icon: const Icon(Icons.add, color: Colors.black),
-                    onPressed: () => controller.createPostingan(context),
-                    tooltip: 'Buat Pengumuman',
-                  ),
               ],
             ),
             body: _buildBody(controller),
@@ -79,6 +74,8 @@ class _ClassDetailState extends State<ClassDetail> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildClassHeader(controller),
+            const SizedBox(height: 20),
+            _buildActionButtons(controller),
             const SizedBox(height: 20),
             _buildAnnouncementsSection(controller),
             const SizedBox(height: 20),
@@ -128,6 +125,85 @@ class _ClassDetailState extends State<ClassDetail> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildActionButtons(ClassDetailController controller) {
+    if (!controller.model.isDosen) return const SizedBox();
+
+    final TextEditingController announcementController = TextEditingController();
+
+    return Row(
+      children: [
+        // Tombol "Buat Tugas" - ✅ DIPERBAIKI: Handle return data
+        Expanded(
+          flex: 2,
+          child: ElevatedButton(
+            onPressed: () async {
+              print("🎯 Tombol Buat Tugas ditekan");
+
+              // ✅ TUNGGU hasil dari CreateAssignmentPage
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CreateAssignmentPage()),
+              );
+
+              // ✅ CEK jika ada data kembali dari form
+              if (result != null && result is Map<String, dynamic>) {
+                print("📦 Data tugas diterima: $result");
+
+                // ✅ PANGGIL CONTROLLER untuk create tugas
+                await controller.createTugas(context, result);
+              } else {
+                print("ℹ️ Tidak ada data tugas yang dikembalikan");
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: controller.primaryRed,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Buat Tugas', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+        ),
+        const SizedBox(width: 10),
+
+        // Input "Umumkan sesuatu..."
+        Expanded(
+          flex: 3,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: controller.primaryRed.withOpacity(0.4)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: announcementController,
+                    decoration: const InputDecoration(
+                      hintText: 'Umumkan sesuatu...',
+                      hintStyle: TextStyle(fontSize: 14, color: Colors.grey),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.send, color: controller.primaryRed),
+                  onPressed: () {
+                    final text = announcementController.text.trim();
+                    if (text.isNotEmpty) {
+                      controller.createPostingan(context, content: text);
+                      announcementController.clear();
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

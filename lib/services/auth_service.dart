@@ -1,3 +1,4 @@
+// auth_service.dart
 import 'api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -12,6 +13,10 @@ class AuthService {
   static const String _userEmailVerifiedKey = 'userEmailVerified';
   static const String _verificationCodeKey = 'verification_code';
   static const String _verificationCodeExpiresKey = 'verification_code_expires';
+
+  // New keys for photo
+  static const String _userPhotoKey = 'user_photo';
+  static const String _userPhotoUrlKey = 'user_photo_url';
 
   // Mahasiswa keys
   static const String _mahasiswaIdKey = 'mahasiswa_id';
@@ -68,7 +73,7 @@ class AuthService {
   }
 
   // ----------------------------
-  // LOGIN
+  // LOGIN - UPDATED FOR NEW API RESPONSE
   // ----------------------------
   static Future<Map<String, dynamic>> login(String email, String password) async {
     print('🔐 Attempting login for: $email');
@@ -87,11 +92,11 @@ class AuthService {
 
           final prefs = await SharedPreferences.getInstance();
 
-          // Simpan data user (umum untuk semua role)
+          // Simpan data user (umum untuk semua role) - UPDATED
           await _saveUserData(userData, token, tokenExpiresAt, prefs);
           print("✅ User data saved - Role: ${userData['role']}");
 
-          // Simpan data mahasiswa JIKA ADA
+          // Simpan data mahasiswa JIKA ADA - UPDATED
           final mahasiswa = responseData['mahasiswa'];
           if (mahasiswa != null) {
             await _saveMahasiswaData(_convertToStringMap(mahasiswa), prefs);
@@ -302,9 +307,6 @@ class AuthService {
   // ----------------------------
   // SEND VERIFICATION CODE
   // ----------------------------
-  // ----------------------------
-  // SEND VERIFICATION CODE - FIXED VERSION
-  // ----------------------------
   static Future<Map<String, dynamic>> sendVerificationCode(String email) async {
     print('📧 Sending verification code to: $email');
 
@@ -396,6 +398,7 @@ class AuthService {
           await prefs.setString(_mahasiswaProdiKey, (responseData['prodi']?.toString() ?? prodi));
           await prefs.setString(_mahasiswaKelasKey, (responseData['kelas']?.toString() ?? kelas));
           await prefs.setString(_mahasiswaTahunMasukKey, (responseData['tahunMasuk']?.toString() ?? ''));
+          await prefs.setString(_mahasiswaDiplomaKey, (responseData['diploma']?.toString() ?? ''));
 
           if (responseData['id'] != null) {
             await prefs.setInt(_mahasiswaIdKey, (responseData['id'] as num).toInt());
@@ -550,7 +553,7 @@ class AuthService {
   }
 
   // ============================
-  // USER DATA GETTERS
+  // USER DATA GETTERS - UPDATED
   // ============================
 
   static Future<String?> getUserName() async {
@@ -578,16 +581,31 @@ class AuthService {
     return prefs.getBool(_userEmailVerifiedKey) ?? false;
   }
 
+  // NEW: Get user photo
+  static Future<String?> getUserPhoto() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_userPhotoKey);
+  }
+
+  // NEW: Get user photo URL
+  static Future<String?> getUserPhotoUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_userPhotoUrlKey);
+  }
+
   static Future<Map<String, dynamic>> getUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final String? role = prefs.getString(_userRoleKey);
 
     Map<String, dynamic> userData = {
       "id": prefs.getInt(_userIdKey),
+      "userId": prefs.getInt(_userIdKey), // Tambah field userId untuk consistency
       "name": prefs.getString(_userNameKey) ?? '',
       "email": prefs.getString(_userEmailKey) ?? '',
       "role": role ?? '',
       "email_verified": prefs.getBool(_userEmailVerifiedKey) ?? false,
+      "photo": prefs.getString(_userPhotoKey) ?? '',
+      "photo_url": prefs.getString(_userPhotoUrlKey) ?? '',
     };
 
     if (role == 'mahasiswa') {
@@ -605,7 +623,7 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     return {
       "id": prefs.getInt(_mahasiswaIdKey) ?? 0,
-      "userId": prefs.getInt(_mahasiswaUserIdKey) ?? 0,
+      "userId": prefs.getInt(_mahasiswaUserIdKey) ?? prefs.getInt(_userIdKey) ?? 0,
       "nama": prefs.getString(_mahasiswaNamaKey) ?? prefs.getString(_userNameKey) ?? '',
       "nim": prefs.getString(_mahasiswaNimKey) ?? '',
       "kelas": prefs.getString(_mahasiswaKelasKey) ?? '',
@@ -620,7 +638,7 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     return {
       "id": prefs.getInt(_dosenIdKey) ?? 0,
-      "userId": prefs.getInt(_dosenUserIdKey) ?? 0,
+      "userId": prefs.getInt(_dosenUserIdKey) ?? prefs.getInt(_userIdKey) ?? 0,
       "nama": prefs.getString(_dosenNamaKey) ?? prefs.getString(_userNameKey) ?? '',
       "nip": prefs.getString(_dosenNipKey) ?? '',
     };
@@ -715,7 +733,7 @@ class AuthService {
   }
 
   // ============================
-  // PRIVATE HELPER METHODS
+  // PRIVATE HELPER METHODS - UPDATED
   // ============================
 
   static Future<void> _saveUserData(
@@ -724,11 +742,17 @@ class AuthService {
     String tokenExpiresAt,
     SharedPreferences prefs,
   ) async {
-    await prefs.setInt(_userIdKey, userData['id']);
-    await prefs.setString(_userNameKey, userData['name']);
-    await prefs.setString(_userEmailKey, userData['email']);
-    await prefs.setString(_userRoleKey, userData['role']);
+    // Support both 'userId' and 'id' fields
+    await prefs.setInt(_userIdKey, userData['userId'] ?? userData['id'] ?? 0);
+    await prefs.setString(_userNameKey, userData['name'] ?? '');
+    await prefs.setString(_userEmailKey, userData['email'] ?? '');
+    await prefs.setString(_userRoleKey, userData['role'] ?? '');
     await prefs.setBool(_userEmailVerifiedKey, userData['email_verified'] ?? false);
+
+    // Save new photo fields
+    await prefs.setString(_userPhotoKey, userData['photo'] ?? '');
+    await prefs.setString(_userPhotoUrlKey, userData['photo_url'] ?? '');
+
     await prefs.setString(_tokenKey, token);
     await prefs.setString(_tokenExpiresKey, tokenExpiresAt);
   }
@@ -781,6 +805,10 @@ class AuthService {
     await prefs.remove(_userEmailVerifiedKey);
     await prefs.remove(_verificationCodeKey);
     await prefs.remove(_verificationCodeExpiresKey);
+
+    // Clear new photo fields
+    await prefs.remove(_userPhotoKey);
+    await prefs.remove(_userPhotoUrlKey);
 
     // Clear role-specific data
     await prefs.remove(_mahasiswaIdKey);
@@ -835,13 +863,11 @@ class AuthService {
     }
   }
 
-  // Tambahkan di AuthService
+  // Emergency logout method
   static Future<void> emergencyLogout() async {
     print('🚨 Emergency logout - clearing all auth data');
     final prefs = await SharedPreferences.getInstance();
     await _clearAuthData(prefs);
     print('✅ All auth data cleared');
   }
-
-  // Panggil method ini jika terjadi infinite loop
 }

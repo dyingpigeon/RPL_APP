@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../controllers/edit_profile_controller.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -51,12 +52,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
           ),
           child: Stack(
             children: [
+              // Tombol back di kiri atas
+              Positioned(
+                top: 10,
+                left: 10,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+
               Align(
                 alignment: Alignment.center,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const CircleAvatar(radius: 50, backgroundImage: AssetImage("assets/profile.jpg")),
+                    // PROFILE PHOTO - Update dengan data dari AuthService
+                    _buildProfilePhoto(controller),
                     const SizedBox(height: 10),
                     Text(
                       "Edit Profile - ${controller.getRoleDisplayName()}",
@@ -75,6 +87,33 @@ class _EditProfilePageState extends State<EditProfilePage> {
         );
       },
     );
+  }
+
+  Widget _buildProfilePhoto(EditProfileController controller) {
+    if (controller.hasProfilePhoto) {
+      return CachedNetworkImage(
+        imageUrl: controller.userPhotoUrl!,
+        imageBuilder: (context, imageProvider) => CircleAvatar(radius: 50, backgroundImage: imageProvider),
+        placeholder:
+            (context, url) => CircleAvatar(
+              radius: 50,
+              backgroundColor: Colors.white.withOpacity(0.3),
+              child: const CircularProgressIndicator(color: Colors.white),
+            ),
+        errorWidget:
+            (context, url, error) => CircleAvatar(
+              radius: 50,
+              backgroundColor: Colors.white.withOpacity(0.3),
+              child: const Icon(Icons.person, size: 40, color: Colors.white),
+            ),
+      );
+    } else {
+      return CircleAvatar(
+        radius: 50,
+        backgroundColor: Colors.white.withOpacity(0.3),
+        child: const Icon(Icons.person, size: 40, color: Colors.white),
+      );
+    }
   }
 
   Widget _buildFormSection() {
@@ -111,7 +150,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
         // Nama (read-only untuk mahasiswa)
         TextFormField(
           controller: controller.namaController,
-          decoration: const InputDecoration(labelText: "Nama", border: OutlineInputBorder(), filled: true),
+          decoration: const InputDecoration(
+            labelText: "Nama",
+            border: OutlineInputBorder(),
+            filled: true,
+            prefixIcon: Icon(Icons.person),
+          ),
           readOnly: true,
           style: TextStyle(color: Colors.grey[600]),
         ),
@@ -120,21 +164,34 @@ class _EditProfilePageState extends State<EditProfilePage> {
         // NIM
         TextFormField(
           controller: controller.nimController,
-          decoration: const InputDecoration(labelText: "NIM", border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+            labelText: "NIM",
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.badge),
+          ),
         ),
         const SizedBox(height: 15),
 
         // Kelas
         TextFormField(
           controller: controller.kelasController,
-          decoration: const InputDecoration(labelText: "Kelas", border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+            labelText: "Kelas",
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.class_),
+          ),
         ),
         const SizedBox(height: 15),
 
         // Prodi (read-only)
         TextFormField(
           controller: controller.prodiController,
-          decoration: const InputDecoration(labelText: "Prodi", border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+            labelText: "Prodi",
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.school),
+            filled: true,
+          ),
           readOnly: true,
         ),
       ],
@@ -147,7 +204,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
         // Nama (read-only untuk dosen)
         TextFormField(
           controller: controller.namaController,
-          decoration: const InputDecoration(labelText: "Nama", border: OutlineInputBorder(), filled: true),
+          decoration: const InputDecoration(
+            labelText: "Nama",
+            border: OutlineInputBorder(),
+            filled: true,
+            prefixIcon: Icon(Icons.person),
+          ),
           readOnly: true,
           style: TextStyle(color: Colors.grey[600]),
         ),
@@ -160,6 +222,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             labelText: "NIP",
             border: OutlineInputBorder(),
             hintText: "Masukkan NIP Anda",
+            prefixIcon: Icon(Icons.badge),
           ),
           keyboardType: TextInputType.number,
         ),
@@ -180,7 +243,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
         child:
             controller.model.isLoading
                 ? const CircularProgressIndicator(color: Colors.white)
-                : Text(controller.getSaveButtonText(), style: const TextStyle(color: Colors.white, fontSize: 16)),
+                : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.save, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(controller.getSaveButtonText(), style: const TextStyle(color: Colors.white, fontSize: 16)),
+                  ],
+                ),
       ),
     );
   }
@@ -195,7 +265,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         onPressed: () => controller.showLogoutDialog(context),
-        child: const Text("Logout", style: TextStyle(color: Colors.white, fontSize: 16)),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.logout, color: Colors.white),
+            SizedBox(width: 8),
+            Text("Logout", style: TextStyle(color: Colors.white, fontSize: 16)),
+          ],
+        ),
       ),
     );
   }

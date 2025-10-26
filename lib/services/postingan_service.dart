@@ -216,10 +216,8 @@ class PostinganService {
     required String judul,
     required String konten,
     int? dosenId,
-    String? fileUrl,
   }) async {
     print("🚀 START createPostingan - jadwalId: $jadwalId");
-    _validateRequiredParams(jadwalId: jadwalId);
 
     try {
       // Jika dosenId tidak diberikan, ambil dari user data
@@ -227,16 +225,11 @@ class PostinganService {
       int finalDosenId = dosenId ?? await _getCurrentDosenId();
       print("✅ Using dosenId: $finalDosenId");
 
-      // ✅ PERUBAHAN: Sesuaikan dengan ApiService yang require Map<String, String>
       // Gabungkan judul dan konten menjadi caption
       final String caption = judul.isNotEmpty ? '$judul\n\n$konten' : konten;
 
-      final body = {
-        'dosenId': finalDosenId.toString(), // ✅ Convert to String
-        'jadwalId': jadwalId.toString(), // ✅ Convert to String
-        'caption': caption, // ✅ Gunakan 'caption' untuk gabungan judul + konten
-        // 'imageUrl' tidak dimasukkan karena tidak ada file
-      };
+      // ✅ Untuk ApiService yang require Map<String, String>
+      final body = {'dosenId': finalDosenId.toString(), 'jadwalId': jadwalId.toString(), 'caption': caption};
 
       print("📤 Creating postingan with body: $body");
 
@@ -245,13 +238,20 @@ class PostinganService {
 
       if (response['statusCode'] == 201 || response['statusCode'] == 200) {
         print("✅ Postingan created successfully");
-        final responseData = response['data']['data'] ?? response['data'];
-        print("🔧 Response data for parsing: $responseData");
+
+        // Pastikan parsing response sesuai dengan struktur API
+        final responseData = response['data'] is Map ? response['data'] : {};
 
         return {'success': true, 'data': Postingan.fromJson(responseData), 'message': 'Postingan berhasil dibuat'};
       } else {
         print("❌ Failed to create postingan: ${response['data']}");
-        return {'success': false, 'message': response['data']['message'] ?? 'Gagal membuat postingan'};
+        return {
+          'success': false,
+          'message':
+              response['data'] is Map
+                  ? response['data']['message'] ?? 'Gagal membuat postingan'
+                  : 'Gagal membuat postingan',
+        };
       }
     } catch (e) {
       print("💥 ERROR in createPostingan: $e");
