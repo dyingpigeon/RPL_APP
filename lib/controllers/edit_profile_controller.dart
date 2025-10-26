@@ -16,9 +16,32 @@ class EditProfileController with ChangeNotifier {
   final TextEditingController prodiController = TextEditingController();
   final TextEditingController nipController = TextEditingController();
 
+  String? _userPhotoUrl;
+  bool _isDisposed = false;
+
+  // GlobalKey untuk ScaffoldMessenger
+  final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
+  // Navigator Key - TAMBAHKAN INI
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   EditProfileController() {
     _loadUserData();
     _debugCheckSharedPreferences();
+  }
+
+  String? get userPhotoUrl => _userPhotoUrl;
+  bool get hasProfilePhoto => _userPhotoUrl != null && _userPhotoUrl!.isNotEmpty;
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    namaController.dispose();
+    nimController.dispose();
+    kelasController.dispose();
+    prodiController.dispose();
+    nipController.dispose();
+    super.dispose();
   }
 
   void _debugCheckSharedPreferences() async {
@@ -27,6 +50,7 @@ class EditProfileController with ChangeNotifier {
     print("user_id: ${prefs.getInt('user_id')}");
     print("userName: ${prefs.getString('userName')}");
     print("userRole: ${prefs.getString('userRole')}");
+    print("user_photo_url: ${prefs.getString('user_photo_url')}");
 
     final role = prefs.getString('userRole');
     if (role == 'mahasiswa') {
@@ -42,137 +66,221 @@ class EditProfileController with ChangeNotifier {
     print("===============================");
   }
 
-  // Future<void> _loadUserData() async {
-  //   final prefs = await SharedPreferences.getInstance();
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final role = prefs.getString('userRole') ?? 'mahasiswa';
 
-  //   // Dapatkan role user
-  //   final role = prefs.getString('userRole') ?? 'mahasiswa';
+    // Load foto profile dari SharedPreferences
+    _userPhotoUrl = prefs.getString('user_photo_url');
 
-  //   _model = _model.copyWith(userRole: role, userId: prefs.getInt('user_id'));
+    // Update model dengan semua data termasuk photoUrl
+    _model = _model.copyWith(userRole: role, userId: prefs.getInt('user_id'), photoUrl: _userPhotoUrl);
 
-  //   namaController.text = prefs.getString('userName') ?? '';
+    namaController.text = prefs.getString('userName') ?? '';
 
-  //   // Load data berdasarkan role
-  //   if (role == 'mahasiswa') {
-  //     _model = _model.copyWith(mahasiswaId: prefs.getInt('mahasiswa_id'));
-  //     nimController.text = prefs.getString('mahasiswa_nim') ?? '';
-  //     kelasController.text = prefs.getString('mahasiswa_kelas') ?? '';
-  //     prodiController.text = prefs.getString('mahasiswa_prodi') ?? '';
-  //   } else if (role == 'dosen') {
-  //     _model = _model.copyWith(dosenId: prefs.getInt('dosen_id'));
-  //     nipController.text = prefs.getString('dosen_nip') ?? '';
-  //   }
+    // Load data berdasarkan role
+    if (role == 'mahasiswa') {
+      _model = _model.copyWith(
+        mahasiswaId: prefs.getInt('mahasiswa_id'),
+        nim: prefs.getString('mahasiswa_nim') ?? '',
+        kelas: prefs.getString('mahasiswa_kelas') ?? '',
+        prodi: prefs.getString('mahasiswa_prodi') ?? '',
+      );
+      nimController.text = prefs.getString('mahasiswa_nim') ?? '';
+      kelasController.text = prefs.getString('mahasiswa_kelas') ?? '';
+      prodiController.text = prefs.getString('mahasiswa_prodi') ?? '';
+    } else if (role == 'dosen') {
+      _model = _model.copyWith(dosenId: prefs.getInt('dosen_id'), nip: prefs.getString('dosen_nip') ?? '');
+      nipController.text = prefs.getString('dosen_nip') ?? '';
+    }
 
-  //   notifyListeners();
-  // }
+    if (!_isDisposed) notifyListeners();
+  }
 
-  Future<void> saveProfile(BuildContext context) async {
+  // Validasi form sebelum menyimpan
+  bool validateForm() {
+    if (namaController.text.isEmpty) {
+      return false;
+    }
+
+    if (_model.isMahasiswa) {
+      if (nimController.text.isEmpty || kelasController.text.isEmpty) {
+        return false;
+      }
+    }
+
+    if (_model.isDosen && nipController.text.isEmpty) {
+      return false;
+    }
+
+    return true;
+  }
+
+  // Cek apakah ada perubahan data
+  Future<bool> get hasChanges async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentName = prefs.getString('userName') ?? '';
+
+    if (_model.isMahasiswa) {
+      final currentNim = prefs.getString('mahasiswa_nim') ?? '';
+      final currentKelas = prefs.getString('mahasiswa_kelas') ?? '';
+
+      return namaController.text != currentName ||
+          nimController.text != currentNim ||
+          kelasController.text != currentKelas;
+    } else {
+      final currentNip = prefs.getString('dosen_nip') ?? '';
+      return namaController.text != currentName || nipController.text != currentNip;
+    }
+  }
+
+  Future<void> saveProfile() async {
+    // Validasi form
+    if (!validateForm()) {
+      _showSnackBar("Harap isi semua field yang wajib diisi!");
+      return;
+    }
+
+    // Cek perubahan data
+    final hasDataChanges = await hasChanges;
+    if (!hasDataChanges) {
+      _showSnackBar("Tidak ada perubahan data untuk disimpan");
+      return;
+    }
+
     if (!_model.hasUserData) {
-      _showSnackBar(context, "ID User tidak ditemukan!");
+      _showSnackBar("ID User tidak ditemukan!");
       return;
     }
 
     _model = _model.copyWith(isLoading: true);
-    notifyListeners();
+    if (!_isDisposed) notifyListeners();
 
     try {
       if (_model.isMahasiswa) {
-        await _saveMahasiswaProfile(context);
+        await _saveMahasiswaProfile();
       } else if (_model.isDosen) {
-        await _saveDosenProfile(context);
+        await _saveDosenProfile();
       }
     } catch (e) {
       _model = _model.copyWith(isLoading: false);
-      notifyListeners();
-      _showSnackBar(context, "Error: $e");
+      if (!_isDisposed) notifyListeners();
+      _showSnackBar("Terjadi kesalahan: ${e.toString()}");
     }
   }
 
-  Future<void> _saveMahasiswaProfile(BuildContext context) async {
+  Future<void> _saveMahasiswaProfile() async {
     if (!_model.hasMahasiswaData) {
-      _showSnackBar(context, "ID Mahasiswa tidak ditemukan!");
+      _showSnackBar("ID Mahasiswa tidak ditemukan!");
       _model = _model.copyWith(isLoading: false);
-      notifyListeners();
+      if (!_isDisposed) notifyListeners();
       return;
     }
 
-    // Jalankan kedua update secara berurutan
-    final resultMahasiswa = await AuthService.updateMahasiswa(
-      id: _model.mahasiswaId!,
-      idu: _model.userId!,
-      nama: namaController.text,
-      nim: nimController.text,
-      prodi: prodiController.text,
-      kelas: kelasController.text,
-    );
+    try {
+      // Update model dengan data terbaru dari controller
+      _model = _model.copyWith(
+        nama: namaController.text,
+        nim: nimController.text,
+        kelas: kelasController.text,
+        prodi: prodiController.text,
+      );
 
-    final resultUser = await AuthService.updateUser(idu: _model.userId!, nama: namaController.text);
+      // Jalankan kedua update secara berurutan
+      final resultMahasiswa = await AuthService.updateMahasiswa(
+        id: _model.mahasiswaId!,
+        idu: _model.userId!,
+        nama: namaController.text,
+        nim: nimController.text,
+        prodi: prodiController.text,
+        kelas: kelasController.text,
+      );
 
-    _model = _model.copyWith(isLoading: false);
-    notifyListeners();
+      final resultUser = await AuthService.updateUser(idu: _model.userId!, nama: namaController.text);
 
-    // Cek hasil kedua request
-    bool mahasiswaSuccess = resultMahasiswa['statusCode'] == 200;
-    bool userSuccess = resultUser['statusCode'] == 200;
+      _model = _model.copyWith(isLoading: false);
+      if (!_isDisposed) notifyListeners();
 
-    if (mahasiswaSuccess && userSuccess) {
-      _showSnackBar(context, "Profil mahasiswa berhasil diperbarui");
-    } else if (mahasiswaSuccess) {
-      _showSnackBar(context, "Profil mahasiswa berhasil, tapi profil user gagal");
-    } else if (userSuccess) {
-      _showSnackBar(context, "Profil user berhasil, tapi profil mahasiswa gagal");
-    } else {
-      String errorMessage = "Kedua update gagal: ";
-      if (resultMahasiswa['data']?['message'] != null) {
-        errorMessage += "Mahasiswa: ${resultMahasiswa['data']['message']} ";
+      // Cek hasil kedua request
+      bool mahasiswaSuccess = resultMahasiswa['statusCode'] == 200;
+      bool userSuccess = resultUser['statusCode'] == 200;
+
+      if (mahasiswaSuccess && userSuccess) {
+        _showSuccessSnackBar("Profil mahasiswa berhasil diperbarui");
+        // Reload data untuk update terbaru
+        await _loadUserData();
+      } else if (mahasiswaSuccess) {
+        _showSnackBar("Profil mahasiswa berhasil, tapi profil user gagal");
+      } else if (userSuccess) {
+        _showSnackBar("Profil user berhasil, tapi profil mahasiswa gagal");
+      } else {
+        String errorMessage = "Kedua update gagal: ";
+        if (resultMahasiswa['data']?['message'] != null) {
+          errorMessage += "Mahasiswa: ${resultMahasiswa['data']['message']} ";
+        }
+        if (resultUser['data']?['message'] != null) {
+          errorMessage += "User: ${resultUser['data']['message']}";
+        }
+        _showSnackBar(errorMessage.isEmpty ? "Unknown error" : errorMessage);
       }
-      if (resultUser['data']?['message'] != null) {
-        errorMessage += "User: ${resultUser['data']['message']}";
-      }
-      _showSnackBar(context, errorMessage.isEmpty ? "Unknown error" : errorMessage);
+    } catch (e) {
+      _model = _model.copyWith(isLoading: false);
+      if (!_isDisposed) notifyListeners();
+      _showSnackBar("Error saat menyimpan profil: ${e.toString()}");
     }
   }
 
-  Future<void> _saveDosenProfile(BuildContext context) async {
+  Future<void> _saveDosenProfile() async {
     if (!_model.hasDosenData) {
-      _showSnackBar(context, "ID Dosen tidak ditemukan!");
+      _showSnackBar("ID Dosen tidak ditemukan!");
       _model = _model.copyWith(isLoading: false);
-      notifyListeners();
+      if (!_isDisposed) notifyListeners();
       return;
     }
 
-    // Update data dosen
-    final resultDosen = await AuthService.updateDosen(
-      id: _model.dosenId!,
-      nama: namaController.text,
-      nip: nipController.text,
-    );
+    try {
+      // Update model dengan data terbaru dari controller
+      _model = _model.copyWith(nama: namaController.text, nip: nipController.text);
 
-    // Update data user (nama)
-    final resultUser = await AuthService.updateUser(idu: _model.userId!, nama: namaController.text);
+      // Update data dosen
+      final resultDosen = await AuthService.updateDosen(
+        id: _model.dosenId!,
+        nama: namaController.text,
+        nip: nipController.text,
+      );
 
-    _model = _model.copyWith(isLoading: false);
-    notifyListeners();
+      // Update data user (nama)
+      final resultUser = await AuthService.updateUser(idu: _model.userId!, nama: namaController.text);
 
-    // Cek hasil kedua request
-    bool dosenSuccess = resultDosen['statusCode'] == 200;
-    bool userSuccess = resultUser['statusCode'] == 200;
+      _model = _model.copyWith(isLoading: false);
+      if (!_isDisposed) notifyListeners();
 
-    if (dosenSuccess && userSuccess) {
-      _showSnackBar(context, "Profil dosen berhasil diperbarui");
-    } else if (dosenSuccess) {
-      _showSnackBar(context, "Profil dosen berhasil, tapi profil user gagal");
-    } else if (userSuccess) {
-      _showSnackBar(context, "Profil user berhasil, tapi profil dosen gagal");
-    } else {
-      String errorMessage = "Kedua update gagal: ";
-      if (resultDosen['data']?['message'] != null) {
-        errorMessage += "Dosen: ${resultDosen['data']['message']} ";
+      // Cek hasil kedua request
+      bool dosenSuccess = resultDosen['statusCode'] == 200;
+      bool userSuccess = resultUser['statusCode'] == 200;
+
+      if (dosenSuccess && userSuccess) {
+        _showSuccessSnackBar("Profil dosen berhasil diperbarui");
+        // Reload data untuk update terbaru
+        await _loadUserData();
+      } else if (dosenSuccess) {
+        _showSnackBar("Profil dosen berhasil, tapi profil user gagal");
+      } else if (userSuccess) {
+        _showSnackBar("Profil user berhasil, tapi profil dosen gagal");
+      } else {
+        String errorMessage = "Kedua update gagal: ";
+        if (resultDosen['data']?['message'] != null) {
+          errorMessage += "Dosen: ${resultDosen['data']['message']} ";
+        }
+        if (resultUser['data']?['message'] != null) {
+          errorMessage += "User: ${resultUser['data']['message']}";
+        }
+        _showSnackBar(errorMessage.isEmpty ? "Unknown error" : errorMessage);
       }
-      if (resultUser['data']?['message'] != null) {
-        errorMessage += "User: ${resultUser['data']['message']}";
-      }
-      _showSnackBar(context, errorMessage.isEmpty ? "Unknown error" : errorMessage);
+    } catch (e) {
+      _model = _model.copyWith(isLoading: false);
+      if (!_isDisposed) notifyListeners();
+      _showSnackBar("Error saat menyimpan profil: ${e.toString()}");
     }
   }
 
@@ -194,9 +302,8 @@ class EditProfileController with ChangeNotifier {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: primaryRed),
               onPressed: () async {
-                await AuthService.logout();
                 Navigator.of(context).pop();
-                Navigator.pushReplacementNamed(context, '/login');
+                await _performLogout();
               },
               child: const Text("Ya", style: TextStyle(color: Colors.white)),
             ),
@@ -206,10 +313,36 @@ class EditProfileController with ChangeNotifier {
     );
   }
 
-  void _showSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: primaryRed, duration: const Duration(seconds: 3)));
+  Future<void> _performLogout() async {
+    _model = _model.copyWith(isLoading: true);
+    if (!_isDisposed) notifyListeners();
+
+    try {
+      await AuthService.logout();
+      _model = _model.copyWith(isLoading: false);
+      if (!_isDisposed) notifyListeners();
+
+      // ✅ GUNAKAN NAVIGATOR KEY - Lebih aman
+      navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (route) => false);
+    } catch (e) {
+      _model = _model.copyWith(isLoading: false);
+      if (!_isDisposed) notifyListeners();
+
+      _showSnackBar("Error saat logout: ${e.toString()}");
+    }
+  }
+
+  // Snackbar methods menggunakan GlobalKey
+  void _showSnackBar(String message) {
+    scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: primaryRed, duration: const Duration(seconds: 3)),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.green, duration: const Duration(seconds: 3)),
+    );
   }
 
   String getRoleDisplayName() {
@@ -220,46 +353,18 @@ class EditProfileController with ChangeNotifier {
     return "Simpan Profil ${getRoleDisplayName()}";
   }
 
-  String? _userPhotoUrl;
-
-  String? get userPhotoUrl => _userPhotoUrl;
-
-  // Update _loadUserData method
-  Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final role = prefs.getString('userRole') ?? 'mahasiswa';
-
-    _model = _model.copyWith(userRole: role, userId: prefs.getInt('user_id'));
-
-    namaController.text = prefs.getString('userName') ?? '';
-
-    // LOAD FOTO PROFILE dari SharedPreferences
-    _userPhotoUrl = prefs.getString('user_photo_url');
-
-    // Load data berdasarkan role
-    if (role == 'mahasiswa') {
-      _model = _model.copyWith(mahasiswaId: prefs.getInt('mahasiswa_id'));
-      nimController.text = prefs.getString('mahasiswa_nim') ?? '';
-      kelasController.text = prefs.getString('mahasiswa_kelas') ?? '';
-      prodiController.text = prefs.getString('mahasiswa_prodi') ?? '';
-    } else if (role == 'dosen') {
-      _model = _model.copyWith(dosenId: prefs.getInt('dosen_id'));
-      nipController.text = prefs.getString('dosen_nip') ?? '';
-    }
-
-    notifyListeners();
+  // Method untuk refresh data
+  Future<void> refreshUserData() async {
+    await _loadUserData();
   }
 
-  // Method untuk check jika ada foto
-  bool get hasProfilePhoto => _userPhotoUrl != null && _userPhotoUrl!.isNotEmpty;
-
-  @override
-  void dispose() {
-    namaController.dispose();
-    nimController.dispose();
-    kelasController.dispose();
-    prodiController.dispose();
-    nipController.dispose();
-    super.dispose();
+  // Method untuk clear form (optional)
+  void clearForm() {
+    namaController.clear();
+    nimController.clear();
+    kelasController.clear();
+    prodiController.clear();
+    nipController.clear();
+    if (!_isDisposed) notifyListeners();
   }
 }

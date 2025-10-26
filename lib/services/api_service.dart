@@ -281,4 +281,54 @@ class ApiService {
       };
     }
   }
+
+  // Tambahkan di api_service.dart - MULTIPART REQUEST SUPPORT
+  static Future<Map<String, dynamic>> multipartRequest({
+    required String endpoint,
+    required Map<String, String> fields,
+    required String fileField,
+    required String filePath,
+  }) async {
+    final url = Uri.parse("$baseUrl/$endpoint");
+    final String? finalToken = await _getToken();
+
+    print('🌐 API MULTIPART: $url');
+    print('📤 Request Fields: $fields');
+    print('📁 File Field: $fileField, Path: $filePath');
+
+    try {
+      var request = http.MultipartRequest('POST', url);
+
+      // Add headers
+      request.headers['Accept'] = 'application/json';
+      if (finalToken != null && finalToken.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $finalToken';
+      }
+
+      // Add fields
+      fields.forEach((key, value) {
+        request.fields[key] = value;
+      });
+
+      // Add file
+      var file = await http.MultipartFile.fromPath(fileField, filePath);
+      request.files.add(file);
+
+      // Send request
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      print('📡 Multipart Response Status: ${response.statusCode}');
+      print('📦 Multipart Response Body: $responseBody');
+
+      final responseData = jsonDecode(responseBody);
+      return {"statusCode": response.statusCode, "data": responseData};
+    } catch (e) {
+      print('💥 Multipart API Error: $e');
+      return {
+        "statusCode": 500,
+        "data": {"message": "Terjadi kesalahan koneksi: $e"},
+      };
+    }
+  }
 }

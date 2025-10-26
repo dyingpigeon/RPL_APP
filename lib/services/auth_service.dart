@@ -870,4 +870,70 @@ class AuthService {
     await _clearAuthData(prefs);
     print('✅ All auth data cleared');
   }
+
+  // ----------------------------
+  // UPDATE USER PHOTO - FIXED VERSION
+  // ----------------------------
+  static Future<Map<String, dynamic>> updateUserPhoto({
+    required int userId,
+    required String name,
+    required String photoPath,
+  }) async {
+    print('🖼️ Updating user photo - ID: $userId, Name: $name');
+
+    try {
+      // ❌ HAPUS penggunaan baseUrl langsung
+      // var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/user/$userId'));
+
+      // ✅ GUNAKAN ApiService.multipartRequest yang sudah ada
+      final result = await ApiService.multipartRequest(
+        endpoint: "user/$userId",
+        fields: {"name": name},
+        fileField: "photo",
+        filePath: photoPath,
+      );
+
+      print('📡 Photo Update Response Status: ${result['statusCode']}');
+
+      if (result['statusCode'] == 200) {
+        // Update local storage dengan data baru
+        final prefs = await SharedPreferences.getInstance();
+
+        // Update nama
+        await prefs.setString(_userNameKey, name);
+
+        // Update photo URL jika ada di response
+        final responseData = result['data'];
+        if (responseData['data'] != null && responseData['data']['photo_url'] != null) {
+          final newPhotoUrl = responseData['data']['photo_url'];
+          await prefs.setString(_userPhotoUrlKey, newPhotoUrl);
+          print("✅ User photo URL updated to: $newPhotoUrl");
+        }
+
+        print("✅ User photo updated successfully");
+        return {
+          "statusCode": result['statusCode'],
+          "data": result['data'],
+          "success": true,
+          "message": "Foto profil berhasil diupdate",
+        };
+      } else {
+        print('❌ Photo update failed: ${result['data']}');
+        return {
+          "statusCode": result['statusCode'],
+          "data": result['data'],
+          "success": false,
+          "message": result['data']['message'] ?? "Gagal mengupdate foto profil",
+        };
+      }
+    } catch (e) {
+      print('💥 Photo update error: $e');
+      return {
+        "statusCode": 500,
+        "data": {"message": "Terjadi kesalahan: $e"},
+        "success": false,
+        "message": "Terjadi kesalahan saat mengupdate foto profil",
+      };
+    }
+  }
 }

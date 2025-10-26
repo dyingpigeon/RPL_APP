@@ -15,77 +15,83 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (context) => EditProfileController(),
-      child: Scaffold(
-        resizeToAvoidBottomInset: false,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Header Section
-                _buildHeaderSection(),
-                const SizedBox(height: 20),
+      child: Consumer<EditProfileController>(
+        builder: (context, controller, child) {
+          return ScaffoldMessenger(
+            key: controller.scaffoldMessengerKey, // ✅ TAMBAHKAN INI
+            child: Scaffold(
+              resizeToAvoidBottomInset: false,
+              body: SafeArea(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Header Section
+                        _buildHeaderSection(controller),
+                        const SizedBox(height: 20),
 
-                // Form Section
-                _buildFormSection(),
-                const SizedBox(height: 30),
-              ],
+                        // Form Section
+                        _buildFormSection(controller),
+                        const SizedBox(height: 30),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildHeaderSection() {
-    return Consumer<EditProfileController>(
-      builder: (context, controller, child) {
-        return Container(
-          height: 220,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFB71C1C), Color(0xFFD32F2F), Color(0xFFE57373)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+  Widget _buildHeaderSection(EditProfileController controller) {
+    return Container(
+      height: 220,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFB71C1C), Color(0xFFD32F2F), Color(0xFFE57373)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+      ),
+      child: Stack(
+        children: [
+          // Tombol back di kiri atas
+          Positioned(
+            top: 10,
+            left: 10,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
             ),
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
           ),
-          child: Stack(
-            children: [
-              // Tombol back di kiri atas
-              Positioned(
-                top: 10,
-                left: 10,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ),
 
-              Align(
-                alignment: Alignment.center,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // PROFILE PHOTO - Update dengan data dari AuthService
-                    _buildProfilePhoto(controller),
-                    const SizedBox(height: 10),
-                    Text(
-                      "Edit Profile - ${controller.getRoleDisplayName()}",
-                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      controller.model.isMahasiswa ? "Update data mahasiswa" : "Update data dosen",
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-                  ],
+          Align(
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // PROFILE PHOTO
+                _buildProfilePhoto(controller),
+                const SizedBox(height: 10),
+                Text(
+                  "Edit Profile - ${controller.getRoleDisplayName()}",
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-              ),
-            ],
+                const SizedBox(height: 5),
+                Text(
+                  controller.model.isMahasiswa ? "Update data mahasiswa" : "Update data dosen",
+                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -94,17 +100,45 @@ class _EditProfilePageState extends State<EditProfilePage> {
       return CachedNetworkImage(
         imageUrl: controller.userPhotoUrl!,
         imageBuilder: (context, imageProvider) => CircleAvatar(radius: 50, backgroundImage: imageProvider),
-        placeholder:
-            (context, url) => CircleAvatar(
+        errorWidget: (context, url, error) {
+          print('❌ CachedNetworkImage Error: $error');
+          print('❌ Failed URL: $url');
+          return CircleAvatar(
+            radius: 50,
+            backgroundColor: Colors.white.withOpacity(0.3),
+            child: const Icon(Icons.person, size: 40, color: Colors.white),
+          );
+        },
+        // ========== CONFIGURATION ==========
+        cacheKey: controller.userPhotoUrl!,
+        maxWidthDiskCache: 300,
+        maxHeightDiskCache: 300,
+        httpHeaders: {"Accept": "image/*", "User-Agent": "Flutter App"},
+        fadeInDuration: const Duration(milliseconds: 300),
+        fadeOutDuration: const Duration(milliseconds: 300),
+        fadeInCurve: Curves.easeIn,
+        useOldImageOnUrlChange: true,
+        memCacheWidth: 200,
+        memCacheHeight: 200,
+        progressIndicatorBuilder:
+            (context, url, downloadProgress) => CircleAvatar(
               radius: 50,
               backgroundColor: Colors.white.withOpacity(0.3),
-              child: const CircularProgressIndicator(color: Colors.white),
-            ),
-        errorWidget:
-            (context, url, error) => CircleAvatar(
-              radius: 50,
-              backgroundColor: Colors.white.withOpacity(0.3),
-              child: const Icon(Icons.person, size: 40, color: Colors.white),
+              child: Stack(
+                children: [
+                  const CircularProgressIndicator(
+                    value: null, // Indeterminate
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                  if (downloadProgress.progress != null)
+                    CircularProgressIndicator(
+                      value: downloadProgress.progress,
+                      color: Colors.white.withOpacity(0.7),
+                      strokeWidth: 2,
+                    ),
+                ],
+              ),
             ),
       );
     } else {
@@ -116,31 +150,27 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-  Widget _buildFormSection() {
-    return Consumer<EditProfileController>(
-      builder: (context, controller, child) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Column(
-            children: [
-              // Tampilkan form berdasarkan role
-              if (controller.model.isMahasiswa)
-                _buildMahasiswaForm(controller)
-              else if (controller.model.isDosen)
-                _buildDosenForm(controller),
+  Widget _buildFormSection(EditProfileController controller) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          // Tampilkan form berdasarkan role
+          if (controller.model.isMahasiswa)
+            _buildMahasiswaForm(controller)
+          else if (controller.model.isDosen)
+            _buildDosenForm(controller),
 
-              const SizedBox(height: 25),
+          const SizedBox(height: 25),
 
-              // Save Button
-              _buildSaveButton(controller),
-              const SizedBox(height: 15),
+          // Save Button
+          _buildSaveButton(controller),
+          const SizedBox(height: 15),
 
-              // Logout Button
-              _buildLogoutButton(controller),
-            ],
-          ),
-        );
-      },
+          // Logout Button
+          _buildLogoutButton(controller),
+        ],
+      ),
     );
   }
 
@@ -239,7 +269,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
           padding: const EdgeInsets.symmetric(vertical: 15),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
-        onPressed: controller.model.canSave ? () => controller.saveProfile(context) : null,
+        onPressed:
+            // ✅ TOMBOL SELALU AKTIF - HAPUS KONDISI canSave
+            () => controller.saveProfile(),
         child:
             controller.model.isLoading
                 ? const CircularProgressIndicator(color: Colors.white)

@@ -105,7 +105,7 @@ class PostinganService {
         final Map<String, String> queryParams = {
           'jadwalId': jadwalId.toString(),
           'page': page.toString(),
-          'per_page': '20',
+          'per_page': '10',
         };
 
         print("🌐 API Call - Endpoint: $endpoint, QueryParams: $queryParams");
@@ -502,9 +502,9 @@ class PostinganService {
         print("📖 Processing page $page");
 
         final Map<String, String> queryParams = {
-          'dosen_id': dosenId.toString(), // Parameter query untuk filter by dosen
+          'dosenId': dosenId.toString(), // Parameter query untuk filter by dosen
           'page': page.toString(),
-          'per_page': '20',
+          'per_page': '10',
         };
 
         print("🌐 API Call - Endpoint: $endpoint, QueryParams: $queryParams");
